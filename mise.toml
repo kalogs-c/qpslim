@@ -1,0 +1,14 @@
+min_version = "2026.4.0"
+
+[tools]
+cmake = "4.4.3"
+ninja = "1.13.2"
+zig = "0.16.0"
+
+[tasks.build]
+description = "Configura (toolchain Zig windows-gnu) e compila o dx11-test"
+run = "cmake -S . -B build --toolchain cmake/toolchain-zig.cmake -G Ninja && cmake --build build"
+
+[tasks.clean]
+description = "Remove o diretorio de build"
+run = "rm -rf build"
