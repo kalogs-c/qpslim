@@ -6,9 +6,9 @@
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
-#include <windows.h>
 #include <d3d11.h>
 #include <dxgi.h>
+#include <windows.h>
 
 #include <cmath>
 #include <cstdio>
@@ -33,10 +33,15 @@ void Log(const char* msg) {
   OutputDebugStringA("\n");
 }
 
+void Quit() {
+  g_running = false;
+  PostQuitMessage(0);
+}
+
 void ShowHResultError(HRESULT hr, const wchar_t* what) {
   wchar_t buf[512];
-  _snwprintf_s(buf, _countof(buf), _TRUNCATE, L"%ls failed (HRESULT=0x%08lX)", what,
-               static_cast<unsigned long>(hr));
+  _snwprintf_s(buf, _countof(buf), _TRUNCATE, L"%ls failed (HRESULT=0x%08lX)",
+               what, static_cast<unsigned long>(hr));
   MessageBoxW(g_hwnd, buf, L"dx11-test", MB_OK | MB_ICONERROR);
 }
 
@@ -59,11 +64,22 @@ bool CreateRenderTarget() {
 }
 
 void DestroyRenderTarget() {
-  if (g_context) g_context->OMSetRenderTargets(0, nullptr, nullptr);
+  if (g_context)
+    g_context->OMSetRenderTargets(0, nullptr, nullptr);
   if (g_rtv) {
     g_rtv->Release();
     g_rtv = nullptr;
   }
+}
+
+HRESULT CreateDeviceAndSwapChain(const DXGI_SWAP_CHAIN_DESC& sd,
+                                 UINT create_flags,
+                                 const D3D_FEATURE_LEVEL* levels,
+                                 UINT level_count, D3D_DRIVER_TYPE driver) {
+  D3D_FEATURE_LEVEL obtained = D3D_FEATURE_LEVEL_11_0;
+  return D3D11CreateDeviceAndSwapChain(
+      nullptr, driver, nullptr, create_flags, levels, level_count,
+      D3D11_SDK_VERSION, &sd, &g_swapchain, &g_device, &obtained, &g_context);
 }
 
 bool InitD3D(HWND hwnd) {
@@ -72,7 +88,7 @@ bool InitD3D(HWND hwnd) {
   sd.BufferDesc.Width = 0;
   sd.BufferDesc.Height = 0;
   sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-  sd.BufferDesc.RefreshRate.Numerator = 0;  // irrelevant with Present(0,0)
+  sd.BufferDesc.RefreshRate.Numerator = 0; // irrelevant with Present(0,0)
   sd.BufferDesc.RefreshRate.Denominator = 1;
   sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
   sd.OutputWindow = hwnd;
@@ -87,25 +103,24 @@ bool InitD3D(HWND hwnd) {
   create_flags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-  const D3D_FEATURE_LEVEL levels[] = {D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0,
-                                      D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0};
-  D3D_FEATURE_LEVEL obtained = D3D_FEATURE_LEVEL_11_0;
+  const D3D_FEATURE_LEVEL levels[] = {
+      D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1,
+      D3D_FEATURE_LEVEL_10_0};
 
-  HRESULT hr = D3D11CreateDeviceAndSwapChain(
-      nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, create_flags, levels, _countof(levels),
-      D3D11_SDK_VERSION, &sd, &g_swapchain, &g_device, &obtained, &g_context);
+  HRESULT hr = CreateDeviceAndSwapChain(
+      sd, create_flags, levels, _countof(levels), D3D_DRIVER_TYPE_HARDWARE);
   if (FAILED(hr)) {
     // WARP fallback for GPU-less VMs.
     Log("Hardware device failed, trying WARP...");
-    hr = D3D11CreateDeviceAndSwapChain(
-        nullptr, D3D_DRIVER_TYPE_WARP, nullptr, create_flags, levels, _countof(levels),
-        D3D11_SDK_VERSION, &sd, &g_swapchain, &g_device, &obtained, &g_context);
+    hr = CreateDeviceAndSwapChain(sd, create_flags, levels, _countof(levels),
+                                  D3D_DRIVER_TYPE_WARP);
   }
   if (FAILED(hr)) {
     ShowHResultError(hr, L"D3D11CreateDeviceAndSwapChain");
     return false;
   }
-  if (!CreateRenderTarget()) return false;
+  if (!CreateRenderTarget())
+    return false;
 
   return true;
 }
@@ -127,37 +142,85 @@ void ShutdownD3D() {
   }
 }
 
+HMODULE TryLoadLimiter() {
+  // Stage B: explicit load; missing DLL means unhooked run, not an error.
+  HMODULE limiter = LoadLibraryW(L"limiter.dll");
+  if (!limiter) {
+    Log("limiter.dll not found, running unhooked.");
+    return nullptr;
+  }
+  typedef int (*Limiter_GetVersionFn)();
+  auto get_version = reinterpret_cast<Limiter_GetVersionFn>(
+      GetProcAddress(limiter, "Limiter_GetVersion"));
+  char msg[64];
+  if (get_version) {
+    snprintf(msg, sizeof(msg), "limiter.dll loaded, version %d", get_version());
+  } else {
+    snprintf(msg, sizeof(msg), "limiter.dll loaded, export missing (%lu)",
+             GetLastError());
+  }
+  Log(msg);
+  return limiter;
+}
+
+double SecondsBetween(const LARGE_INTEGER& from, const LARGE_INTEGER& to,
+                      const LARGE_INTEGER& freq) {
+  return static_cast<double>(to.QuadPart - from.QuadPart) /
+         static_cast<double>(freq.QuadPart);
+}
+
+void UpdateFpsTitle(UINT& frames_since_title, LARGE_INTEGER& t_title,
+                    const LARGE_INTEGER& now, const LARGE_INTEGER& freq) {
+  double since_title = SecondsBetween(t_title, now, freq);
+  if (since_title < 0.5)
+    return;
+  double fps = frames_since_title / since_title;
+  wchar_t title[128];
+  _snwprintf_s(title, _countof(title), _TRUNCATE,
+               L"dx11-test — FPS: %.0f (no VSYNC)", fps);
+  SetWindowTextW(g_hwnd, title);
+  // Also visible in DebugView; basis for hook-count comparison later.
+  char logbuf[128];
+  snprintf(logbuf, sizeof(logbuf), "Present frames: %u in %.3fs = %.1f FPS",
+           frames_since_title, since_title, fps);
+  Log(logbuf);
+  frames_since_title = 0;
+  t_title = now;
+}
+
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
   switch (msg) {
-    case WM_DESTROY:
-      g_running = false;
-      PostQuitMessage(0);
+  case WM_DESTROY:
+    Quit();
+    return 0;
+  case WM_KEYDOWN:
+    if (wparam == VK_ESCAPE) {
+      Quit();
       return 0;
-    case WM_KEYDOWN:
-      if (wparam == VK_ESCAPE) {
-        g_running = false;
-        PostQuitMessage(0);
-        return 0;
-      }
-      break;
-    case WM_SIZE:
-      if (g_swapchain && wparam != SIZE_MINIMIZED) {
-        DestroyRenderTarget();
-        UINT w = LOWORD(lparam);
-        UINT h = HIWORD(lparam);
-        if (w == 0) w = 1;
-        if (h == 0) h = 1;
-        HRESULT hr = g_swapchain->ResizeBuffers(0, w, h, DXGI_FORMAT_UNKNOWN, 0);
-        if (SUCCEEDED(hr)) {
-          CreateRenderTarget();
-        }
-      }
+    }
+    break;
+  case WM_SIZE:
+    if (!g_swapchain)
       return 0;
+    if (wparam == SIZE_MINIMIZED)
+      return 0;
+    DestroyRenderTarget();
+    UINT w = LOWORD(lparam);
+    UINT h = HIWORD(lparam);
+    if (w == 0)
+      w = 1;
+    if (h == 0)
+      h = 1;
+    if (SUCCEEDED(
+            g_swapchain->ResizeBuffers(0, w, h, DXGI_FORMAT_UNKNOWN, 0))) {
+      CreateRenderTarget();
+    }
+    return 0;
   }
   return DefWindowProcW(hwnd, msg, wparam, lparam);
 }
 
-}  // namespace
+} // namespace
 
 // ANSI entry (not wWinMain): the mingw CRT only resolves WinMain without
 // extra flags. Command line is ignored; all text uses W APIs.
@@ -169,42 +232,31 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
   wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
   wc.lpfnWndProc = WndProc;
   wc.hInstance = inst;
-  wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));  // IDC_ARROW
+  wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512)); // IDC_ARROW
   wc.lpszClassName = kClass;
   if (!RegisterClassExW(&wc)) {
-    MessageBoxW(nullptr, L"RegisterClassEx failed", L"dx11-test", MB_OK | MB_ICONERROR);
+    MessageBoxW(nullptr, L"RegisterClassEx failed", L"dx11-test",
+                MB_OK | MB_ICONERROR);
     return 1;
   }
 
   RECT rc{0, 0, 1280, 720};
   AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-  g_hwnd = CreateWindowExW(0, kClass, L"dx11-test — FPS: ...", WS_OVERLAPPEDWINDOW,
-                           CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left,
-                           rc.bottom - rc.top, nullptr, nullptr, inst, nullptr);
+  g_hwnd =
+      CreateWindowExW(0, kClass, L"dx11-test — FPS: ...", WS_OVERLAPPEDWINDOW,
+                      CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left,
+                      rc.bottom - rc.top, nullptr, nullptr, inst, nullptr);
   if (!g_hwnd) {
-    MessageBoxW(nullptr, L"CreateWindowEx failed", L"dx11-test", MB_OK | MB_ICONERROR);
+    MessageBoxW(nullptr, L"CreateWindowEx failed", L"dx11-test",
+                MB_OK | MB_ICONERROR);
     return 1;
   }
 
-  // Stage B: explicit load; missing DLL means unhooked run, not an error.
-  HMODULE limiter = LoadLibraryW(L"limiter.dll");
-  if (limiter) {
-    typedef int (*Limiter_GetVersionFn)();
-    auto get_version = reinterpret_cast<Limiter_GetVersionFn>(
-        GetProcAddress(limiter, "Limiter_GetVersion"));
-    char msg[64];
-    if (get_version) {
-      snprintf(msg, sizeof(msg), "limiter.dll loaded, version %d", get_version());
-    } else {
-      snprintf(msg, sizeof(msg), "limiter.dll loaded, export missing (%lu)", GetLastError());
-    }
-    Log(msg);
-  } else {
-    Log("limiter.dll not found, running unhooked.");
-  }
+  HMODULE limiter = TryLoadLimiter();
 
   if (!InitD3D(g_hwnd)) {
-    if (limiter) FreeLibrary(limiter);
+    if (limiter)
+      FreeLibrary(limiter);
     ShutdownD3D();
     return 1;
   }
@@ -218,21 +270,21 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
   t_title = t0;
 
   UINT frames_since_title = 0;
-  char logbuf[128];
 
   MSG msg{};
   while (g_running) {
     while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
-      if (msg.message == WM_QUIT) g_running = false;
+      if (msg.message == WM_QUIT)
+        g_running = false;
       TranslateMessage(&msg);
       DispatchMessageW(&msg);
     }
-    if (!g_running) break;
+    if (!g_running)
+      break;
 
     LARGE_INTEGER now{};
     QueryPerformanceCounter(&now);
-    double elapsed =
-        static_cast<double>(now.QuadPart - t0.QuadPart) / static_cast<double>(freq.QuadPart);
+    double elapsed = SecondsBetween(t0, now, freq);
 
     // Animated: every presented frame must be visibly new.
     float r = 0.5f + 0.5f * sinf(static_cast<float>(elapsed * 1.7));
@@ -252,25 +304,12 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
 
     frames_since_title++;
 
-    double since_title =
-        static_cast<double>(now.QuadPart - t_title.QuadPart) / static_cast<double>(freq.QuadPart);
-    if (since_title >= 0.5) {
-      double fps = frames_since_title / since_title;
-      wchar_t title[128];
-      _snwprintf_s(title, _countof(title), _TRUNCATE, L"dx11-test — FPS: %.0f (no VSYNC)",
-                   fps);
-      SetWindowTextW(g_hwnd, title);
-      // Also visible in DebugView; basis for hook-count comparison later.
-      snprintf(logbuf, sizeof(logbuf), "Present frames: %u in %.3fs = %.1f FPS",
-               frames_since_title, since_title, fps);
-      Log(logbuf);
-      frames_since_title = 0;
-      t_title = now;
-    }
+    UpdateFpsTitle(frames_since_title, t_title, now, freq);
   }
 
   ShutdownD3D();
   DestroyWindow(g_hwnd);
-  if (limiter) FreeLibrary(limiter);
+  if (limiter)
+    FreeLibrary(limiter);
   return 0;
 }

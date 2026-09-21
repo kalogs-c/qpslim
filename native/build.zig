@@ -4,6 +4,15 @@
 
 const std = @import("std");
 
+const cxx_flags = [_][]const u8{ "-std=c++17", "-Wall", "-Wextra" };
+
+fn newCxxModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Module {
+    return b.createModule(.{
+        .target = target,
+        .optimize = optimize,
+    });
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .x86_64,
@@ -14,21 +23,19 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "dx11-test",
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = newCxxModule(b, target, optimize),
     });
     exe.root_module.addCSourceFile(.{
         .file = b.path("dx11-test/main.cpp"),
-        .flags = &.{ "-std=c++17", "-Wall", "-Wextra" },
+        .flags = &cxx_flags,
     });
     exe.root_module.link_libcpp = true;
     // System libs must be listed explicitly.
     const syslibs = [_][]const u8{
-        "d3d11", "dxgi",
-        "kernel32", "user32", "gdi32",
-        "ole32", "oleaut32", "uuid",
+        "d3d11",    "dxgi",
+        "kernel32", "user32",
+        "gdi32",    "ole32",
+        "oleaut32", "uuid",
         "advapi32", "shell32",
     };
     for (syslibs) |lib| {
@@ -40,14 +47,11 @@ pub fn build(b: *std.Build) void {
     const dll = b.addLibrary(.{
         .name = "limiter",
         .linkage = .dynamic,
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = newCxxModule(b, target, optimize),
     });
     dll.root_module.addCSourceFile(.{
         .file = b.path("limiter/limiter.cpp"),
-        .flags = &.{ "-std=c++17", "-Wall", "-Wextra" },
+        .flags = &cxx_flags,
     });
     // kernel32 + bundled mingw libc (headers + DllMainCRTStartup).
     // No libc++: this DLL uses Win32 API only, by design.
