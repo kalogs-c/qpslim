@@ -187,7 +187,25 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
     return 1;
   }
 
+  // Stage B: explicit load; missing DLL means unhooked run, not an error.
+  HMODULE limiter = LoadLibraryW(L"limiter.dll");
+  if (limiter) {
+    typedef int (*Limiter_GetVersionFn)();
+    auto get_version = reinterpret_cast<Limiter_GetVersionFn>(
+        GetProcAddress(limiter, "Limiter_GetVersion"));
+    char msg[64];
+    if (get_version) {
+      snprintf(msg, sizeof(msg), "limiter.dll loaded, version %d", get_version());
+    } else {
+      snprintf(msg, sizeof(msg), "limiter.dll loaded, export missing (%lu)", GetLastError());
+    }
+    Log(msg);
+  } else {
+    Log("limiter.dll not found, running unhooked.");
+  }
+
   if (!InitD3D(g_hwnd)) {
+    if (limiter) FreeLibrary(limiter);
     ShutdownD3D();
     return 1;
   }
@@ -254,5 +272,6 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
 
   ShutdownD3D();
   DestroyWindow(g_hwnd);
+  if (limiter) FreeLibrary(limiter);
   return 0;
 }

@@ -1,6 +1,6 @@
 // Native backend build (C++). Run from native/:  zig build
-// Cross-compiles x86_64-windows-gnu. Output: zig-out/bin/dx11-test.exe
-// Future targets (limiter.dll, injector) go here.
+// Cross-compiles x86_64-windows-gnu. Output: zig-out/bin/
+// Targets: dx11-test.exe (test harness), limiter.dll (hook backend).
 
 const std = @import("std");
 
@@ -36,4 +36,22 @@ pub fn build(b: *std.Build) void {
     }
     exe.subsystem = .Windows;
     b.installArtifact(exe);
+
+    const dll = b.addLibrary(.{
+        .name = "limiter",
+        .linkage = .dynamic,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    dll.root_module.addCSourceFile(.{
+        .file = b.path("limiter/limiter.cpp"),
+        .flags = &.{ "-std=c++17", "-Wall", "-Wextra" },
+    });
+    // kernel32 + bundled mingw libc (headers + DllMainCRTStartup).
+    // No libc++: this DLL uses Win32 API only, by design.
+    dll.root_module.link_libc = true;
+    dll.root_module.linkSystemLibrary("kernel32", .{});
+    b.installArtifact(dll);
 }

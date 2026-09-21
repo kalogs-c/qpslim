@@ -11,7 +11,7 @@ native/
 ├── build.zig.zon      # manifesto do pacote
 ├── dx11-test/         # alvo de teste do PoC (Etapa A) — descartável no longo prazo
 │   └── main.cpp
-├── limiter/           # (Etapa B+) limiter.dll: hook de Present + frame pacer
+├── limiter/           # limiter.dll: DllMain + exports (hook de Present a partir da C)
 └── injector/          # (futuro) injector.exe: carrega a DLL no jogo
 ```
 
@@ -44,7 +44,17 @@ Esperado: janela 1280x720 pulsante, `FPS: NNN` no título, resize ok, ESC fecha.
 Logs saem via `OutputDebugString` (DebugView) — base para comparar contagem
 interna vs. contagem do hook (Etapas C/D).
 
-## Contrato futuro (limiter.dll)
+## limiter.dll (Etapa B)
+
+Esqueleto carregável: `DllMain` mínimo (só log + `DisableThreadLibraryCalls`)
+e um export `Limiter_GetVersion()`. Sem hook ainda.
+
+Detalhe de build: a DLL linka `kernel32` + libc mingw (headers + startup),
+**sem** `libc++` — usa só Win32 API, de propósito. O `dx11-test` carrega via
+`LoadLibrary("limiter.dll")` se existir ao lado do exe; sem a DLL, roda
+normal (carga opcional).
+
+## Contrato futuro (a partir da Etapa C)
 
 * `DllMain` mínimo: só log + `DisableThreadLibraryCalls` (loader lock).
 * API: `enable()` / `disable()` / `set_target_fps(n)` — a UI nunca fala com o

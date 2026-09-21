@@ -7,7 +7,7 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | A concluída — próximo: **B (DLL esqueleto carregável)** |
+| Etapa atual | B em validação — `limiter.dll` compila, falta rodar no Windows |
 | Última atualização | 2026-09-21 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
@@ -33,7 +33,8 @@ correta). Steam é fonte de detecção, nunca dependência do limiter.
 
 - [x] **A — dx11-test mínimo** (janela Win32 + D3D11, `Present(0,0)` sem VSYNC,
       FPS no título). Validado via cross-compile.
-- [ ] **B — DLL esqueleto** (carrega no processo, `OutputDebugString`, sem hook).
+- [~] **B — DLL esqueleto** (compila via `zig build`; ATTACH/DETACH no
+      Windows pendente de validação).
 - [ ] **C — hook de `IDXGISwapChain::Present`**.
 - [ ] **D — contar/medir Presents**.
 - [ ] **E — limiter extremamente simples** (só provar o conceito).

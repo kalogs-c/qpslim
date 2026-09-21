@@ -1,14 +1,7 @@
 ---
-name: zig-0.16
+name: zig-0-16
 description: Zig 0.16.0 API guidance and porting notes. Use this when writing or upgrading Zig code to the 0.16.0 stable release (std.Io era, @Type removal, @cImport deprecation).
-license: MIT
-compatibility:
-  - opencode
-  - claude-code
-metadata:
-  version: "0.16.0"
-  language: "zig"
-  category: "programming-language"
+disable-model-invocation: false
 ---
 
 # Zig 0.16.0 Programming Guide
