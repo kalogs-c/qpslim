@@ -3,10 +3,9 @@
 // Propositalmente simples: janela Win32 + clear color animado + FPS no titulo.
 // VSYNC desligado (Present(0,0)) para gerar o maximo de Presents possivel.
 //
-// Compilar (Linux, padrao via mise): mise run build  (toolchain Zig)
-// Compilar (Linux, fallback MinGW):  cmake -B build --toolchain ../cmake/toolchain-mingw64.cmake
-//                                    cmake --build build
-// Compilar (Windows, VS2022):        cmake -B build && cmake --build build --config Release
+// Build (via mise, da raiz):  mise run build   (saida: native/zig-out/bin/)
+//   direto (da pasta native/): zig build
+//   otimizado p/ medicao:     zig build -Doptimize=ReleaseFast
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

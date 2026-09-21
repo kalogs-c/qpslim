@@ -1,0 +1,11 @@
+.{
+    .name = .fps_limiter_native,
+    .version = "0.1.0",
+    .fingerprint = 0xd7790ce820af6be7,
+    .minimum_zig_version = "0.16.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "dx11-test",
+    },
+}

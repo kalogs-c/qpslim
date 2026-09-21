@@ -1,14 +1,18 @@
 min_version = "2026.4.0"
 
 [tools]
-cmake = "4.4.3"
-ninja = "1.13.2"
 zig = "0.16.0"
 
 [tasks.build]
-description = "Configura (toolchain Zig windows-gnu) e compila o dx11-test"
-run = "cmake -S . -B build --toolchain cmake/toolchain-zig.cmake -G Ninja && cmake --build build"
+description = "Compila o dx11-test (x86_64-windows-gnu) via zig build"
+dir = "native"
+run = "zig build"
+
+[tasks.release]
+description = "Compila otimizado para medicao real (-Doptimize=ReleaseFast)"
+dir = "native"
+run = "zig build -Doptimize=ReleaseFast"
 
 [tasks.clean]
-description = "Remove o diretorio de build"
-run = "rm -rf build"
+description = "Remove artefatos de build"
+run = "rm -rf native/zig-out native/zig-cache build"

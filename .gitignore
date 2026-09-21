@@ -1,4 +1,6 @@
-build/
+zig-out/
+zig-cache/
+.zig-cache/
+.cache/
 *.user
 .vs/
-.cache

@@ -9,9 +9,8 @@
 |---|---|
 | Etapa atual | A concluída — próximo: **B (DLL esqueleto carregável)** |
 | Última atualização | 2026-09-21 |
-| Toolchain padrão (Linux) | Zig via `mise` (`mise run build`) |
-| Toolchain fallback (Linux) | MinGW-w64 via apt (`cmake/toolchain-mingw64.cmake`) |
-| Toolchain nativo (Windows) | VS2022 + MSVC (sem toolchain file) |
+| Build do nativo | `zig build` via `mise` (só `zig 0.16.0`; CMake removido) |
+| Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
 
 ## 1. Objetivo
 
@@ -77,20 +76,17 @@ A UI não conhece o backend. Troca de implementação interna sem reescrever a U
 
 ## 6. Toolchain e workflow
 
-Dependências gerenciadas por **`mise`** (`mise.toml`): `cmake 4.4.3`,
-`ninja 1.13.2`, `zig 0.16.0`.
+Dependências gerenciadas por **`mise`** (`mise.toml`): só `zig 0.16.0`
+(compilador + build system; sem CMake/Ninja).
 
 ```bash
 mise install          # uma vez (requer `mise trust` no primeiro uso)
-mise run build        # configura com toolchain Zig + compila
-mise run clean        # remove build/
+mise run build        # zig build em native/ → native/zig-out/bin/
+mise run release      # -Doptimize=ReleaseFast (medição real)
+mise run clean        # remove artefatos
 ```
 
-| Ambiente | Comando |
-|---|---|
-| Linux (padrão, sem sudo) | `mise run build` → `build/dx11-test/dx11-test.exe` |
-| Linux fallback (apt, com sudo) | `cmake -B build --toolchain cmake/toolchain-mingw64.cmake -G Ninja && cmake --build build` |
-| Windows VS2022 | `cmake -B build && cmake --build build --config Release` |
+Build direto (sem mise): `cd native && zig build`.
 
 Validação do `.exe` no Linux (sem `file`/binutils): script Python checa
 `MZ` + assinatura `PE` + machine `0x8664` + subsystem GUI(2) + símbolo
@@ -101,29 +97,32 @@ Estrutura atual:
 
 ```text
 .
-├── mise.toml
-├── CMakeLists.txt
-├── cmake/toolchain-zig.cmake        # padrão
-├── cmake/toolchain-mingw64.cmake    # fallback (suporta $MINGW_ROOT)
-├── dx11-test/main.cpp
-└── docs/PLAN.md                     # este arquivo
+├── mise.toml              # só zig + tasks
+├── docs/PLAN.md           # este arquivo
+└── native/                # todo C++/nativo (separado do futuro app/)
+    ├── build.zig          # build de tudo: exe, dll, injector
+    ├── build.zig.zon
+    └── dx11-test/main.cpp
 ```
+
+Futuro: `core/` (Rust) e `app/` (Tauri) ao lado de `native/`.
 
 ## 7. Decisões técnicas registradas
 
-1. **Zig como cross-compiler padrão** (não MinGW via apt): sem sudo, headers e
-   libs `windows-gnu` embutidos, reprodutível via `mise`. MinGW-GCC mantido
-   como fallback — ambos compilam hoje.
-2. **Entry `WinMain` ANSI (não `wWinMain`)**: o CRT do Zig só resolve
-   `WinMain`; linha de comando é ignorada. Remove a necessidade do `-municode`
-   do GCC. Vale nos 3 toolchains.
+1. **Zig como compilador + build system; CMake removido.** `zig build`
+   substitui `CMakeLists` + toolchains: 1 ferramenta em vez de 3, `build.zig`
+   é código legível de cima a baixo. Histórico CMake preservado no git.
+   System libs Win32 são linkadas manualmente (o CMake fazia implícito).
+2. **Entry `WinMain` ANSI (não `wWinMain`)**: o CRT mingw só resolve
+   `WinMain` sem flags extras; linha de comando é ignorada.
 3. **Sem link `d3dcompiler`**: o demo não compila shaders; o Zig não empacota
    esse import lib. Só `d3d11 + dxgi`.
-4. **Subsystem GUI forçado no Zig** (`LINKER:--subsystem,windows`): o driver do
-   Zig ignora o `-mwindows` que o CMake emite para `WIN32`.
-5. **`zig c++` = libc++, não libstdc++**: ok para o PoC (só `cmath/cstdio/string`
+4. **Subsystem GUI via `exe.subsystem = .Windows`** no `build.zig`.
+5. **Zig linka libc++ (não libstdc++)**: ok para o PoC (só `cmath/cstdio/string`
    + API C do D3D). Reavaliar se o hook futuro exigir ABI específica.
-6. **Começar em C++, portar para Rust depois** (Etapa I): menos variáveis no PoC.
+6. **Começar em C++, núcleo em Rust depois** (Etapa I): menos variáveis no PoC.
+   O `core/` será Rust (vira crate usada direto pelo Tauri, zero FFI);
+   o hook em `native/` fica C++. Zig é compilador, não linguagem do produto.
 7. **Sem Steam/profiles/Tauri/gamepad/DX12/Vulkan até o pacing estar provado.**
 
 ## 8. Como trabalhar (protocolo do agente)
