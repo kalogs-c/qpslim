@@ -12,7 +12,6 @@
 
 #include <cmath>
 #include <cstdio>
-#include <string>
 
 // MSVC needs explicit pragma; other toolchains link via build.zig.
 #if defined(_MSC_VER)
