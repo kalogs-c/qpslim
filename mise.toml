@@ -4,15 +4,15 @@ min_version = "2026.4.0"
 zig = "0.16.0"
 
 [tasks.build]
-description = "Compila o dx11-test (x86_64-windows-gnu) via zig build"
+description = "Build dx11-test (x86_64-windows-gnu) via zig build"
 dir = "native"
 run = "zig build"
 
 [tasks.release]
-description = "Compila otimizado para medicao real (-Doptimize=ReleaseFast)"
+description = "Optimized build for real measurement (-Doptimize=ReleaseFast)"
 dir = "native"
 run = "zig build -Doptimize=ReleaseFast"
 
 [tasks.clean]
-description = "Remove artefatos de build"
+description = "Remove build artifacts"
 run = "rm -rf native/zig-out native/zig-cache build"

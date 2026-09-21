@@ -1,11 +1,8 @@
-// dx11-test — Etapa A
-// Alvo minimo DirectX 11 para o futuro hook de IDXGISwapChain::Present.
-// Propositalmente simples: janela Win32 + clear color animado + FPS no titulo.
-// VSYNC desligado (Present(0,0)) para gerar o maximo de Presents possivel.
-//
-// Build (via mise, da raiz):  mise run build   (saida: native/zig-out/bin/)
-//   direto (da pasta native/): zig build
-//   otimizado p/ medicao:     zig build -Doptimize=ReleaseFast
+// dx11-test: minimal DX11 target for the future IDXGISwapChain::Present hook.
+// Win32 window + animated clear color + FPS title. VSYNC off (Present(0,0)).
+// Build (via mise, from root):  mise run build   (output: native/zig-out/bin/)
+//   direct (from native/):       zig build
+//   optimized for measurement:   zig build -Doptimize=ReleaseFast
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -17,7 +14,7 @@
 #include <cstdio>
 #include <string>
 
-// Link automático no MSVC. No MinGW/Zig o link vem do CMake (d3d11 dxgi).
+// MSVC needs explicit pragma; other toolchains link via build.zig.
 #if defined(_MSC_VER)
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -25,14 +22,12 @@
 
 namespace {
 
-// Estado global mínimo (PoC, sem abstrações ainda).
 HWND g_hwnd = nullptr;
 ID3D11Device* g_device = nullptr;
 ID3D11DeviceContext* g_context = nullptr;
 IDXGISwapChain* g_swapchain = nullptr;
 ID3D11RenderTargetView* g_rtv = nullptr;
 bool g_running = true;
-bool g_device_ok = false;
 
 void Log(const char* msg) {
   OutputDebugStringA(msg);
@@ -41,7 +36,7 @@ void Log(const char* msg) {
 
 void ShowHResultError(HRESULT hr, const wchar_t* what) {
   wchar_t buf[512];
-  _snwprintf_s(buf, _countof(buf), _TRUNCATE, L"%ls falhou (HRESULT=0x%08lX)", what,
+  _snwprintf_s(buf, _countof(buf), _TRUNCATE, L"%ls failed (HRESULT=0x%08lX)", what,
                static_cast<unsigned long>(hr));
   MessageBoxW(g_hwnd, buf, L"dx11-test", MB_OK | MB_ICONERROR);
 }
@@ -75,10 +70,10 @@ void DestroyRenderTarget() {
 bool InitD3D(HWND hwnd) {
   DXGI_SWAP_CHAIN_DESC sd{};
   sd.BufferCount = 2;
-  sd.BufferDesc.Width = 0;   // usa largura da janela
-  sd.BufferDesc.Height = 0;  // usa altura da janela
+  sd.BufferDesc.Width = 0;
+  sd.BufferDesc.Height = 0;
   sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-  sd.BufferDesc.RefreshRate.Numerator = 0;  // irrelevante com Present(0,0)
+  sd.BufferDesc.RefreshRate.Numerator = 0;  // irrelevant with Present(0,0)
   sd.BufferDesc.RefreshRate.Denominator = 1;
   sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
   sd.OutputWindow = hwnd;
@@ -101,8 +96,8 @@ bool InitD3D(HWND hwnd) {
       nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, create_flags, levels, _countof(levels),
       D3D11_SDK_VERSION, &sd, &g_swapchain, &g_device, &obtained, &g_context);
   if (FAILED(hr)) {
-    // Fallback WARP: permite rodar em VM sem GPU (lento, mas nao trava a Etapa A).
-    Log("Hardware falhou, tentando WARP...");
+    // WARP fallback for GPU-less VMs.
+    Log("Hardware device failed, trying WARP...");
     hr = D3D11CreateDeviceAndSwapChain(
         nullptr, D3D_DRIVER_TYPE_WARP, nullptr, create_flags, levels, _countof(levels),
         D3D11_SDK_VERSION, &sd, &g_swapchain, &g_device, &obtained, &g_context);
@@ -113,7 +108,6 @@ bool InitD3D(HWND hwnd) {
   }
   if (!CreateRenderTarget()) return false;
 
-  g_device_ok = true;
   return true;
 }
 
@@ -166,9 +160,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 
 }  // namespace
 
-// Entry ANSI de proposito (nao wWinMain): funciona identico nos tres
-// toolchains (MSVC, GCC-MinGW e Zig) sem precisar da flag -municode
-// do GCC. A linha de comando e ignorada; todo texto usa APIs W.
+// ANSI entry (not wWinMain): the mingw CRT only resolves WinMain without
+// extra flags. Command line is ignored; all text uses W APIs.
 int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
   const wchar_t* kClass = L"QpslimDx11Test";
 
@@ -180,7 +173,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
   wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));  // IDC_ARROW
   wc.lpszClassName = kClass;
   if (!RegisterClassExW(&wc)) {
-    MessageBoxW(nullptr, L"RegisterClassEx falhou", L"dx11-test", MB_OK | MB_ICONERROR);
+    MessageBoxW(nullptr, L"RegisterClassEx failed", L"dx11-test", MB_OK | MB_ICONERROR);
     return 1;
   }
 
@@ -190,7 +183,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
                            CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left,
                            rc.bottom - rc.top, nullptr, nullptr, inst, nullptr);
   if (!g_hwnd) {
-    MessageBoxW(nullptr, L"CreateWindowEx falhou", L"dx11-test", MB_OK | MB_ICONERROR);
+    MessageBoxW(nullptr, L"CreateWindowEx failed", L"dx11-test", MB_OK | MB_ICONERROR);
     return 1;
   }
 
@@ -202,11 +195,9 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
   ShowWindow(g_hwnd, show);
   UpdateWindow(g_hwnd);
 
-  // Timer de alta resolucao para FPS + cor animada.
-  LARGE_INTEGER freq{}, t0{}, t_prev{}, t_title{};
+  LARGE_INTEGER freq{}, t0{}, t_title{};
   QueryPerformanceFrequency(&freq);
   QueryPerformanceCounter(&t0);
-  t_prev = t0;
   t_title = t0;
 
   UINT frames_since_title = 0;
@@ -214,7 +205,6 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
 
   MSG msg{};
   while (g_running) {
-    // Drena mensagens sem bloquear (jogo real faz igual).
     while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
       if (msg.message == WM_QUIT) g_running = false;
       TranslateMessage(&msg);
@@ -227,7 +217,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
     double elapsed =
         static_cast<double>(now.QuadPart - t0.QuadPart) / static_cast<double>(freq.QuadPart);
 
-    // Cor animada: prova visual de que o frame e novo.
+    // Animated: every presented frame must be visibly new.
     float r = 0.5f + 0.5f * sinf(static_cast<float>(elapsed * 1.7));
     float g = 0.5f + 0.5f * sinf(static_cast<float>(elapsed * 2.3 + 2.1));
     float b = 0.5f + 0.5f * sinf(static_cast<float>(elapsed * 3.1 + 4.2));
@@ -235,11 +225,11 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
     g_context->OMSetRenderTargets(1, &g_rtv, nullptr);
     g_context->ClearRenderTargetView(g_rtv, clear);
 
-    // VSYNC OFF: apresenta imediatamente, sem espera. E aqui que o
-    // futuro hook de Present vai contar/medir/limitar.
+    // VSYNC off: present immediately. The future Present hook
+    // will count/measure/limit here.
     HRESULT hr = g_swapchain->Present(0, 0);
     if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET) {
-      Log("Device lost — saindo. (Etapa A nao trata reset, apenas reporta.)");
+      Log("Device lost, exiting.");
       break;
     }
 
@@ -250,19 +240,16 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
     if (since_title >= 0.5) {
       double fps = frames_since_title / since_title;
       wchar_t title[128];
-      _snwprintf_s(title, _countof(title), _TRUNCATE, L"dx11-test — FPS: %.0f (Present sem VSYNC)",
+      _snwprintf_s(title, _countof(title), _TRUNCATE, L"dx11-test — FPS: %.0f (no VSYNC)",
                    fps);
       SetWindowTextW(g_hwnd, title);
-      // Tambem sai no DebugView / debugger — util na Etapa C/D para
-      // comparar contagem interna vs. contagem do hook.
-      snprintf(logbuf, sizeof(logbuf), "Present frames: %u em %.3fs = %.1f FPS",
+      // Also visible in DebugView; basis for hook-count comparison later.
+      snprintf(logbuf, sizeof(logbuf), "Present frames: %u in %.3fs = %.1f FPS",
                frames_since_title, since_title, fps);
       Log(logbuf);
       frames_since_title = 0;
       t_title = now;
     }
-
-    (void)t_prev;
   }
 
   ShutdownD3D();

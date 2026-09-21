@@ -1,10 +1,6 @@
-// Build do backend nativo (C++) via `zig build`.
-// Roda daqui (native/):  zig build
-// Cross-compila x86_64-windows-gnu com o proprio Zig — sem CMake/Ninja.
-// Saida: zig-out/bin/dx11-test.exe
-//
-// Equivalente a etapa: janela Win32 + D3D11, Present(0,0) sem VSYNC.
-// Alvos futuros (limiter.dll, injector) entram neste arquivo.
+// Native backend build (C++). Run from native/:  zig build
+// Cross-compiles x86_64-windows-gnu. Output: zig-out/bin/dx11-test.exe
+// Future targets (limiter.dll, injector) go here.
 
 const std = @import("std");
 
@@ -28,7 +24,7 @@ pub fn build(b: *std.Build) void {
         .flags = &.{ "-std=c++17", "-Wall", "-Wextra" },
     });
     exe.root_module.link_libcpp = true;
-    // D3D + Win32 (o CMake linkava essas implicitamente; aqui e manual).
+    // System libs must be listed explicitly.
     const syslibs = [_][]const u8{
         "d3d11", "dxgi",
         "kernel32", "user32", "gdi32",
