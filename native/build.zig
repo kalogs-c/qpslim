@@ -49,10 +49,17 @@ pub fn build(b: *std.Build) void {
         .linkage = .dynamic,
         .root_module = newCxxModule(b, target, optimize),
     });
-    dll.root_module.addCSourceFile(.{
-        .file = b.path("limiter/limiter.cpp"),
-        .flags = &cxx_flags,
-    });
+    const dll_sources = [_][]const u8{
+        "limiter/limiter.cpp",
+        "limiter/hook.cpp",
+    };
+    for (dll_sources) |src| {
+        dll.root_module.addCSourceFile(.{
+            .file = b.path(src),
+            .flags = &cxx_flags,
+        });
+    }
+
     // kernel32 + bundled mingw libc (headers + DllMainCRTStartup).
     // No libc++: this DLL uses Win32 API only, by design.
     dll.root_module.link_libc = true;

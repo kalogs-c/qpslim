@@ -44,15 +44,28 @@ Esperado: janela 1280x720 pulsante, `FPS: NNN` no título, resize ok, ESC fecha.
 Logs saem via `OutputDebugString` (DebugView) — base para comparar contagem
 interna vs. contagem do hook (Etapas C/D).
 
-## limiter.dll (Etapa B)
+## limiter.dll (Etapa C)
 
-Esqueleto carregável: `DllMain` mínimo (só log + `DisableThreadLibraryCalls`)
-e um export `Limiter_GetVersion()`. Sem hook ainda.
+Esqueleto + hook de `Present`: `DllMain` mínimo (só log + `DisableThreadLibraryCalls`),
+exports `Limiter_GetVersion()` / `Limiter_HookSwapChain()` /
+`Limiter_UnhookSwapChain()`.
+
+O hook (`hook.h`/`hook.cpp`) troca o slot 8 da vtable da swapchain pelo nosso
+`HookedPresent`, que conta (atômico), repassa ao original e volta. Log no
+DebugView a cada 300 presents. `UnhookSwapChain()` restaura o slot — chamado
+pelo teste na saída, antes de liberar a swapchain. O `DLL_PROCESS_DETACH`
+só loga: patch sob loader lock arrisca deadlock, então a reversão é sempre
+explícita pelo host.
+
+Limitação conhecida (Stage C): um patch cobre todas as swapchains da mesma
+classe COM, mas outra classe (ex.: segunda janela via `IDXGISwapChain1`) tem
+vtable própria e fica de fora. Cobertura multi-classe vem com a descoberta
+automática, fora desta etapa.
 
 Detalhe de build: a DLL linka `kernel32` + libc mingw (headers + startup),
-**sem** `libc++` — usa só Win32 API, de propósito. O `dx11-test` carrega via
-`LoadLibrary("limiter.dll")` se existir ao lado do exe; sem a DLL, roda
-normal (carga opcional).
+**sem** `libc++` — usa só Win32 API + `<stdio.h>`, de propósito. O `dx11-test`
+carrega via `LoadLibrary("limiter.dll")` e entrega sua swapchain via
+`Limiter_HookSwapChain`; sem a DLL, roda normal (carga opcional).
 
 ## Contrato futuro (a partir da Etapa C)
 
