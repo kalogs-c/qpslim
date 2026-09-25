@@ -62,6 +62,14 @@ classe COM, mas outra classe (ex.: segunda janela via `IDXGISwapChain1`) tem
 vtable própria e fica de fora. Cobertura multi-classe vem com a descoberta
 automática, fora desta etapa.
 
+## Medição (Etapa D)
+
+Cada `Present` carimba `QueryPerformanceCounter`; deltas em ticks vão para um
+ring buffer de 240 amostras (sem alocação/lock no caminho quente — só inteiros).
+`Limiter_GetStats()` devolve `{ present_count, fps_avg, frametime_avg_ms,
+frametime_max_ms }` sobre a janela; o teste lê a cada 0.5s e cruza com o
+próprio contador. Single-writer, leitor ocasional, diagnóstico.
+
 Detalhe de build: a DLL linka `kernel32` + libc mingw (headers + startup),
 **sem** `libc++` — usa só Win32 API + `<stdio.h>`, de propósito. O `dx11-test`
 carrega via `LoadLibrary("limiter.dll")` e entrega sua swapchain via

@@ -11,6 +11,7 @@
 #include <windows.h>
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 
 // MSVC needs explicit pragma; other toolchains link via build.zig.
@@ -213,8 +214,39 @@ double SecondsBetween(const LARGE_INTEGER& from, const LARGE_INTEGER& to,
          static_cast<double>(freq.QuadPart);
 }
 
-void UpdateFpsTitle(UINT& frames_since_title, LARGE_INTEGER& t_title,
-                    const LARGE_INTEGER& now, const LARGE_INTEGER& freq) {
+struct LimiterStats {
+  uint64_t present_count;
+  double fps_avg;
+  double frametime_avg_ms;
+  double frametime_max_ms;
+};
+
+typedef BOOL (*Limiter_GetStatsFn)(LimiterStats*);
+
+void LogLimiterStats(HMODULE limiter, double app_fps) {
+  if (!limiter) {
+    return;
+  }
+  auto get_stats =
+      GetLimiterProc<Limiter_GetStatsFn>(limiter, "Limiter_GetStats");
+  if (!get_stats) {
+    return;
+  }
+  LimiterStats stats{};
+  if (!get_stats(&stats)) {
+    return;
+  }
+  char logbuf[160];
+  snprintf(logbuf, sizeof(logbuf),
+           "limiter stats: fps=%.1f avg=%.2fms max=%.2fms n=%llu (app %.1f)",
+           stats.fps_avg, stats.frametime_avg_ms, stats.frametime_max_ms,
+           stats.present_count, app_fps);
+  Log(logbuf);
+}
+
+void UpdateFpsTitle(HMODULE limiter, UINT& frames_since_title,
+                    LARGE_INTEGER& t_title, const LARGE_INTEGER& now,
+                    const LARGE_INTEGER& freq) {
   double since_title = SecondsBetween(t_title, now, freq);
   if (since_title < 0.5) {
     return;
@@ -229,6 +261,7 @@ void UpdateFpsTitle(UINT& frames_since_title, LARGE_INTEGER& t_title,
   snprintf(logbuf, sizeof(logbuf), "Present frames: %u in %.3fs = %.1f FPS",
            frames_since_title, since_title, fps);
   Log(logbuf);
+  LogLimiterStats(limiter, fps);
   frames_since_title = 0;
   t_title = now;
 }
@@ -365,7 +398,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
       break;
     }
     frames_since_title++;
-    UpdateFpsTitle(frames_since_title, t_title, now, freq);
+    UpdateFpsTitle(limiter, frames_since_title, t_title, now, freq);
   }
 
   TryUnhookPresent(limiter);

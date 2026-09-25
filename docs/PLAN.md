@@ -7,7 +7,7 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | C em validação — hook compila, falta rodar no Windows |
+| Etapa atual | D em validação — medição compila, falta rodar no Windows |
 | Última atualização | 2026-09-21 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
@@ -34,8 +34,10 @@ correta). Steam é fonte de detecção, nunca dependência do limiter.
 - [x] **A — dx11-test mínimo** (janela Win32 + D3D11, `Present(0,0)` sem VSYNC,
       FPS no título). Validado via cross-compile.
 - [x] **B — DLL esqueleto** (ATTACH/DETACH validados no Windows).
-- [~] **C — hook de `IDXGISwapChain::Present`** (compila; sequência no
-      DebugView pendente de validação).
+- [x] **C — hook de `IDXGISwapChain::Present`** (hook + review fixes de
+      race/ABI, commitado).
+- [~] **D — contar/medir Presents** (compila; comparação DLL-vs-app pendente
+      de validação).
 - [ ] **D — contar/medir Presents**.
 - [ ] **E — limiter extremamente simples** (só provar o conceito).
 - [ ] **F — medir FPS e frametime**.

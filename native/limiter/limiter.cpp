@@ -22,6 +22,10 @@ extern "C" __declspec(dllexport) void Limiter_UnhookSwapChain() {
   UnhookSwapChain();
 }
 
+extern "C" __declspec(dllexport) BOOL Limiter_GetStats(LimiterStats* out) {
+  return GetPresentStats(out) ? TRUE : FALSE;
+}
+
 BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
   if (reason == DLL_PROCESS_ATTACH) {
     DisableThreadLibraryCalls(inst);
