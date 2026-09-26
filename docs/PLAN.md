@@ -7,7 +7,7 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | I em validação — injector compila, falta injetar no Control |
+| Etapa atual | J em implementação — descoberta automática da swapchain |
 | Última atualização | 2026-09-25 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
@@ -45,8 +45,8 @@ correta). Steam é fonte de detecção, nunca dependência do limiter.
       jitter ~0.4ms sob cap 60; validado focado no Windows).
 - [x] **H — testar 30/40/45/60/72/90/120** (alvo via CLI, matriz validada
       no Windows).
-- [~] **I — injector** (`injector.exe` via CreateRemoteThread; validar no
-      Control DX11, sem anti-cheat).
+- [x] **I — injector** (carga remota validada em jogo real: `ATTACH`
+      limpo, DLL inerte sem setter — esperado).
 - [ ] **J — descoberta automática** (pescar swapchain na criação; aposenta
       o setter).
 - [ ] **K — núcleo em Rust** (`core/`).
