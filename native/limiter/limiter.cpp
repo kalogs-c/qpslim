@@ -1,4 +1,4 @@
-// limiter.dll — Stage E: version + hook control + naive frame cap.
+// limiter.dll — version + hook control + frame cap.
 // The hook itself lives in hook.cpp. Win32 API only (no STL):
 // keeps libc/libc++ out of the DLL.
 

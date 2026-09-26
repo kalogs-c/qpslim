@@ -2,6 +2,7 @@
 // vtable, forwards every call to the saved original.
 // Stage D: timestamps every Present into a ring buffer for stats.
 // Stage E: naive frame cap via Sleep-to-deadline.
+// Stage G: hybrid pacing via Sleep bulk + QPC spin.
 #pragma once
 
 #include <dxgi.h>

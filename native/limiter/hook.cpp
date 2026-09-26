@@ -13,6 +13,7 @@
 #define PRESENT_VTABLE_INDEX 8
 #define LOG_EVERY_N_PRESENTS 300
 #define STATS_WINDOW 240
+#define SPIN_MARGIN_MS 2
 
 namespace {
 
@@ -26,13 +27,12 @@ LONG64 g_present_count = 0;
 uint64_t g_frametimes[STATS_WINDOW] = {};
 uint64_t g_prev_ticks = 0;
 uint64_t g_qpc_freq = 0;
-// Naive cap (Stage E): frame interval in ticks, 0 = unlimited.
+// Frame cap interval in ticks, 0 = unlimited.
 uint64_t g_interval_ticks = 0;
 uint64_t g_next_deadline = 0;
-// Spin margin (Stage G): last stretch covered by QPC spin, not Sleep.
+// Last stretch covered by QPC spin, not Sleep.
 uint64_t g_spin_margin_ticks = 0;
 bool g_timer_high_res = false;
-#define SPIN_MARGIN_MS 2
 
 void LogCount(LONG64 count) {
   char msg[64];
@@ -63,6 +63,15 @@ void ReleaseTimerRes() {
   }
 }
 
+uint64_t SpinUntilDeadline(uint64_t deadline) {
+  LARGE_INTEGER t = {};
+  do {
+    YieldProcessor();
+    QueryPerformanceCounter(&t);
+  } while (static_cast<uint64_t>(t.QuadPart) < deadline);
+  return static_cast<uint64_t>(t.QuadPart);
+}
+
 void WaitForDeadline(uint64_t now) {
   if (g_interval_ticks == 0) {
     return;
@@ -78,12 +87,7 @@ void WaitForDeadline(uint64_t now) {
     if (sleep_ms > 0) {
       Sleep(static_cast<DWORD>(sleep_ms));
     }
-    LARGE_INTEGER t = {};
-    do {
-      YieldProcessor();
-      QueryPerformanceCounter(&t);
-      now = static_cast<uint64_t>(t.QuadPart);
-    } while (now < g_next_deadline);
+    now = SpinUntilDeadline(g_next_deadline);
   }
   g_next_deadline = AdvanceDeadline(g_next_deadline, g_interval_ticks, now);
 }

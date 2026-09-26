@@ -13,6 +13,23 @@ fn newCxxModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     });
 }
 
+fn addHostTest(b: *std.Build, test_step: *std.Build.Step, optimize: std.builtin.OptimizeMode, name: []const u8, zig_src: []const u8, cpp_src: []const u8) void {
+    const t = b.addTest(.{
+        .name = name,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path(zig_src),
+            .target = b.graph.host,
+            .optimize = optimize,
+        }),
+    });
+    t.root_module.addCSourceFile(.{
+        .file = b.path(cpp_src),
+        .flags = &cxx_flags,
+    });
+    t.root_module.link_libcpp = true;
+    test_step.dependOn(&b.addRunArtifact(t).step);
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .x86_64,
@@ -69,38 +86,8 @@ pub fn build(b: *std.Build) void {
     dll.root_module.linkSystemLibrary("winmm", .{});
     b.installArtifact(dll);
 
-    // Host unit tests for the pure stats math (no Windows needed).
-    const stats_test = b.addTest(.{
-        .name = "stats-test",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("common/stats_test.zig"),
-            .target = b.graph.host,
-            .optimize = optimize,
-        }),
-    });
-    stats_test.root_module.addCSourceFile(.{
-        .file = b.path("common/stats.cpp"),
-        .flags = &cxx_flags,
-    });
-    stats_test.root_module.link_libcpp = true;
-    const run_stats_test = b.addRunArtifact(stats_test);
+    // Host unit tests for pure math (no Windows needed).
     const test_step = b.step("test", "Run host unit tests");
-    test_step.dependOn(&run_stats_test.step);
-
-    // Host unit tests for the pure pacer math (no Windows needed).
-    const pacer_test = b.addTest(.{
-        .name = "pacer-test",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("common/pacer_test.zig"),
-            .target = b.graph.host,
-            .optimize = optimize,
-        }),
-    });
-    pacer_test.root_module.addCSourceFile(.{
-        .file = b.path("common/pacer.cpp"),
-        .flags = &cxx_flags,
-    });
-    pacer_test.root_module.link_libcpp = true;
-    const run_pacer_test = b.addRunArtifact(pacer_test);
-    test_step.dependOn(&run_pacer_test.step);
+    addHostTest(b, test_step, optimize, "stats-test", "common/stats_test.zig", "common/stats.cpp");
+    addHostTest(b, test_step, optimize, "pacer-test", "common/pacer_test.zig", "common/pacer.cpp");
 }
