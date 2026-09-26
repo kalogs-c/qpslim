@@ -42,10 +42,16 @@ pub fn build(b: *std.Build) void {
         .name = "dx11-test",
         .root_module = newCxxModule(b, target, optimize),
     });
-    exe.root_module.addCSourceFile(.{
-        .file = b.path("graphics-api/dx11/main.cpp"),
-        .flags = &cxx_flags,
-    });
+    const exe_sources = [_][]const u8{
+        "graphics-api/dx11/main.cpp",
+        "common/args.cpp",
+    };
+    for (exe_sources) |src| {
+        exe.root_module.addCSourceFile(.{
+            .file = b.path(src),
+            .flags = &cxx_flags,
+        });
+    }
     exe.root_module.link_libcpp = true;
     // System libs must be listed explicitly.
     const syslibs = [_][]const u8{
@@ -90,4 +96,5 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run host unit tests");
     addHostTest(b, test_step, optimize, "stats-test", "common/stats_test.zig", "common/stats.cpp");
     addHostTest(b, test_step, optimize, "pacer-test", "common/pacer_test.zig", "common/pacer.cpp");
+    addHostTest(b, test_step, optimize, "args-test", "common/args_test.zig", "common/args.cpp");
 }

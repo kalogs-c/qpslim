@@ -42,6 +42,8 @@ Janela Win32 + device/swapchain D3D11, `Present(0,0)` sem VSYNC, cor animada e
 FPS no título via `QueryPerformanceCounter`. Fallback WARP se não houver GPU.
 
 Execução real só no Windows 10/11: levar `native/zig-out/bin/dx11-test.exe`.
+Alvo via CLI (`dx11-test.exe 40`, default 60); janela sempre em primeiro
+plano nos runs de medição.
 Esperado: janela 1280x720 pulsante, `FPS: NNN` no título, resize ok, ESC fecha.
 Logs saem via `OutputDebugString` (DebugView) — base para comparar contagem
 interna vs. contagem do hook (Etapas C/D).

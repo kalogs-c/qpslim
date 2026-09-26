@@ -14,6 +14,7 @@
 #include <cstdio>
 
 #include "../../common/stats.h"
+#include "../../common/args.h"
 
 // MSVC needs explicit pragma; other toolchains link via build.zig.
 #if defined(_MSC_VER)
@@ -151,9 +152,6 @@ typedef void (*Limiter_UnhookSwapChainFn)();
 typedef int (*Limiter_GetVersionFn)();
 typedef void (*Limiter_SetTargetFpsFn)(int);
 
-// Fixed cap for Stage E (no UI yet).
-constexpr int kTargetFps = 60;
-
 template <typename Fn> Fn GetLimiterProc(HMODULE limiter, const char* name) {
   // Fresh error code: GetProcAddress may leave a stale one behind.
   SetLastError(0);
@@ -180,19 +178,19 @@ HMODULE TryLoadLimiter() {
   return limiter;
 }
 
-void TryApplyTargetFps(HMODULE limiter) {
+void TryApplyTargetFps(HMODULE limiter, int target_fps) {
   auto set_target = GetLimiterProc<Limiter_SetTargetFpsFn>(
       limiter, "Limiter_SetTargetFps");
   if (!set_target) {
     return;
   }
-  set_target(kTargetFps);
+  set_target(target_fps);
   char msg[64];
-  snprintf(msg, sizeof(msg), "limiter target: %d FPS", kTargetFps);
+  snprintf(msg, sizeof(msg), "limiter target: %d FPS", target_fps);
   Log(msg);
 }
 
-bool TryHookPresent(HMODULE limiter) {
+bool TryHookPresent(HMODULE limiter, int target_fps) {
   if (!limiter) {
     return false;
   }
@@ -210,7 +208,7 @@ bool TryHookPresent(HMODULE limiter) {
     Log("present hook failed.");
     return false;
   }
-  TryApplyTargetFps(limiter);
+  TryApplyTargetFps(limiter, target_fps);
   return true;
 }
 
@@ -342,8 +340,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 } // namespace
 
 // ANSI entry (not wWinMain): the mingw CRT only resolves WinMain without
-// extra flags. Command line is ignored; all text uses W APIs.
-int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
+// extra flags. cmd_line holds the optional target FPS; all text uses W APIs.
+int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR cmd_line, int show) {
   const wchar_t* kClass = L"QpslimDx11Test";
 
   WNDCLASSEXW wc{};
@@ -382,7 +380,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
   }
 
   // Optional: failures are already logged inside TryHookPresent.
-  TryHookPresent(limiter);
+  int target_fps = ParseTargetFps(cmd_line, FPS_DEFAULT);
+  TryHookPresent(limiter, target_fps);
 
   ShowWindow(g_hwnd, show);
   UpdateWindow(g_hwnd);

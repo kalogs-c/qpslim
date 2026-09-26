@@ -7,7 +7,7 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | G validada no Windows — próxima H (matriz 30–120) |
+| Etapa atual | H validada no Windows — PoC nativo completo; próxima I (núcleo Rust) |
 | Última atualização | 2026-09-25 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
@@ -43,7 +43,8 @@ correta). Steam é fonte de detecção, nunca dependência do limiter.
       `avg≈16.65ms`, `max≈31.6ms` sistemático por quantum do timer).
 - [x] **G — frame pacing** (híbrido Sleep+spin: `avg≈16.67`, `max≈17.0`,
       jitter ~0.4ms sob cap 60; validado focado no Windows).
-- [ ] **H — testar 30/40/45/60/72/90/120**.
+- [x] **H — testar 30/40/45/60/72/90/120** (alvo via CLI, matriz validada
+      no Windows).
 - [ ] **I — núcleo em Rust** (`core/`).
 - [ ] **J — UI Tauri** (overlay minimalista, sem roubar foco).
 - [ ] **K — hotkey + gamepad**.
