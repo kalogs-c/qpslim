@@ -1,6 +1,8 @@
 // Present hook via vtable slot patch.
 #include "hook.h"
 
+#include "../common/pacer.h"
+
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
@@ -27,6 +29,10 @@ uint64_t g_qpc_freq = 0;
 // Naive cap (Stage E): frame interval in ticks, 0 = unlimited.
 uint64_t g_interval_ticks = 0;
 uint64_t g_next_deadline = 0;
+// Spin margin (Stage G): last stretch covered by QPC spin, not Sleep.
+uint64_t g_spin_margin_ticks = 0;
+bool g_timer_high_res = false;
+#define SPIN_MARGIN_MS 2
 
 void LogCount(LONG64 count) {
   char msg[64];
@@ -41,8 +47,22 @@ void RecordPresentTick(uint64_t ticks, LONG64 count) {
   g_prev_ticks = ticks;
 }
 
-// Deliberately naive: coarse Sleep, truncated sub-ms, no drift correction.
-// Good pacing is Stage G's problem.
+// Hybrid wait (Stage G): Sleep the bulk, QPC-spin the last stretch.
+// Absolute deadlines with fast-forward: missed beats are skipped,
+// never bursted, never owed.
+void RequestTimerRes() {
+  if (!g_timer_high_res && timeBeginPeriod(1) == TIMERR_NOERROR) {
+    g_timer_high_res = true;
+  }
+}
+
+void ReleaseTimerRes() {
+  if (g_timer_high_res) {
+    timeEndPeriod(1);
+    g_timer_high_res = false;
+  }
+}
+
 void WaitForDeadline(uint64_t now) {
   if (g_interval_ticks == 0) {
     return;
@@ -51,15 +71,21 @@ void WaitForDeadline(uint64_t now) {
     g_next_deadline = now + g_interval_ticks;
     return;
   }
-  if (now >= g_next_deadline) {
-    g_next_deadline += g_interval_ticks;
-    return;
+  if (now < g_next_deadline) {
+    RequestTimerRes();
+    uint64_t sleep_ms = SleepMsFor(now, g_next_deadline, g_qpc_freq,
+                                   g_spin_margin_ticks);
+    if (sleep_ms > 0) {
+      Sleep(static_cast<DWORD>(sleep_ms));
+    }
+    LARGE_INTEGER t = {};
+    do {
+      YieldProcessor();
+      QueryPerformanceCounter(&t);
+      now = static_cast<uint64_t>(t.QuadPart);
+    } while (now < g_next_deadline);
   }
-  uint64_t wait_ms = (g_next_deadline - now) * 1000 / g_qpc_freq;
-  if (wait_ms > 0) {
-    Sleep(static_cast<DWORD>(wait_ms));
-  }
-  g_next_deadline += g_interval_ticks;
+  g_next_deadline = AdvanceDeadline(g_next_deadline, g_interval_ticks, now);
 }
 
 HRESULT STDMETHODCALLTYPE HookedPresent(IDXGISwapChain* self, UINT sync,
@@ -101,9 +127,11 @@ void SetTargetFps(int fps) {
   g_next_deadline = 0;
   if (fps <= 0 || g_qpc_freq == 0) {
     g_interval_ticks = 0;
+    ReleaseTimerRes();
     return;
   }
   g_interval_ticks = g_qpc_freq / static_cast<uint64_t>(fps);
+  g_spin_margin_ticks = g_qpc_freq * SPIN_MARGIN_MS / 1000;
 }
 
 bool HookSwapChain(IDXGISwapChain* swapchain) {
@@ -141,6 +169,7 @@ void UnhookSwapChain() {
   WriteVtableSlot(g_vtable, PRESENT_VTABLE_INDEX,
                   reinterpret_cast<void*>(g_original_present));
   g_vtable = nullptr;
+  ReleaseTimerRes();
   // g_original_present intentionally kept: in-flight HookedPresent calls
   // still route through it, and DXGI code is always valid.
   OutputDebugStringA("limiter: present unhooked, slot restored");

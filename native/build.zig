@@ -53,6 +53,7 @@ pub fn build(b: *std.Build) void {
         "limiter/limiter.cpp",
         "limiter/hook.cpp",
         "common/stats.cpp",
+        "common/pacer.cpp",
     };
     for (dll_sources) |src| {
         dll.root_module.addCSourceFile(.{
@@ -61,10 +62,11 @@ pub fn build(b: *std.Build) void {
         });
     }
 
-    // kernel32 + bundled mingw libc (headers + DllMainCRTStartup).
+    // kernel32 + winmm (timer resolution) + bundled mingw libc.
     // No libc++: this DLL uses Win32 API only, by design.
     dll.root_module.link_libc = true;
     dll.root_module.linkSystemLibrary("kernel32", .{});
+    dll.root_module.linkSystemLibrary("winmm", .{});
     b.installArtifact(dll);
 
     // Host unit tests for the pure stats math (no Windows needed).
@@ -82,6 +84,23 @@ pub fn build(b: *std.Build) void {
     });
     stats_test.root_module.link_libcpp = true;
     const run_stats_test = b.addRunArtifact(stats_test);
-    const test_step = b.step("test", "Run stats unit tests on the host");
+    const test_step = b.step("test", "Run host unit tests");
     test_step.dependOn(&run_stats_test.step);
+
+    // Host unit tests for the pure pacer math (no Windows needed).
+    const pacer_test = b.addTest(.{
+        .name = "pacer-test",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("common/pacer_test.zig"),
+            .target = b.graph.host,
+            .optimize = optimize,
+        }),
+    });
+    pacer_test.root_module.addCSourceFile(.{
+        .file = b.path("common/pacer.cpp"),
+        .flags = &cxx_flags,
+    });
+    pacer_test.root_module.link_libcpp = true;
+    const run_pacer_test = b.addRunArtifact(pacer_test);
+    test_step.dependOn(&run_pacer_test.step);
 }

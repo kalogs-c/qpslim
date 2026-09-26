@@ -7,7 +7,7 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | F validada no Windows — próxima G (frame pacing) |
+| Etapa atual | G validada no Windows — próxima H (matriz 30–120) |
 | Última atualização | 2026-09-25 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
@@ -41,8 +41,8 @@ correta). Steam é fonte de detecção, nunca dependência do limiter.
 - [x] **E — limiter extremamente simples** (cap ingênuo, validado no Windows).
 - [x] **F — medir FPS e frametime** (DLL-vs-app < 1%; baseline sob cap 60:
       `avg≈16.65ms`, `max≈31.6ms` sistemático por quantum do timer).
-- [ ] **G — melhorar frame pacing** (QPC, deadlines absolutos, drift, sleep +
-      espera de alta precisão).
+- [x] **G — frame pacing** (híbrido Sleep+spin: `avg≈16.67`, `max≈17.0`,
+      jitter ~0.4ms sob cap 60; validado focado no Windows).
 - [ ] **H — testar 30/40/45/60/72/90/120**.
 - [ ] **I — núcleo em Rust** (`core/`).
 - [ ] **J — UI Tauri** (overlay minimalista, sem roubar foco).

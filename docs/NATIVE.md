@@ -54,6 +54,18 @@ arma `intervalo = freq/fps`; cada `Present` dorme o restante até o deadline
 rajada de catch-up. Sem correção de drift, sem spin: pacing bom é a Etapa G.
 O teste fixa 60 FPS via `kTargetFps` após o hook.
 
+## Pacer (Etapa G)
+
+Espera híbrida: `timeBeginPeriod(1)` + `Sleep` do grosso + spin QPC com
+`YieldProcessor()` nos ~2ms finais; deadlines absolutos com fast-forward
+(pula beats perdidos, sem rajada e sem dívida). Matemática pura em
+`common/pacer.{h,cpp}` (`SleepMsFor`, `AdvanceDeadline`) com testes em
+`common/pacer_test.zig`. A DLL linka `winmm` pelo timer.
+
+Resultado sob cap 60 (run focado no Windows): `avg≈16.67`, `max≈17.0`,
+jitter ~0.4ms (baseline E era `max≈31.6`). Runs de medição exigem a janela
+em primeiro plano — DWM em background distorce o timing.
+
 O hook (`hook.h`/`hook.cpp`) troca o slot 8 da vtable da swapchain pelo nosso
 `HookedPresent`, que conta (atômico), repassa ao original e volta. Log no
 DebugView a cada 300 presents. `UnhookSwapChain()` restaura o slot — chamado
