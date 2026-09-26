@@ -1,4 +1,4 @@
-# Core — núcleo do produto (planejado, Etapa I)
+# Core — núcleo do produto (planejado, Etapa K)
 
 > Status: **não existe código ainda**. Idioma planejado: Rust (crate usada
 > direto pelo Tauri, zero FFI).

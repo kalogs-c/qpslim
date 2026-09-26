@@ -7,7 +7,7 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | H validada no Windows — PoC nativo completo; próxima I (núcleo Rust) |
+| Etapa atual | I em validação — injector compila, falta injetar no Control |
 | Última atualização | 2026-09-25 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
@@ -17,8 +17,8 @@
 | Camada | Doc | Estado |
 |---|---|---|
 | `native/` — hook DLL, pacer, injector (C++) | `docs/NATIVE.md` | PoC em andamento (Etapas A–E feitas) |
-| `core/` — Limiter API, profiles, detecção (Rust) | `docs/CORE.md` | Planejado (Etapa I) |
-| `app/` — overlay/UI (Tauri) | `docs/TAURI.md` | Planejado (Etapa J) |
+| `core/` — Limiter API, profiles, detecção (Rust) | `docs/CORE.md` | Planejado (Etapa K) |
+| `app/` — overlay/UI (Tauri) | `docs/TAURI.md` | Planejado (Etapa L) |
 
 ## 1. Objetivo
 
@@ -45,12 +45,16 @@ correta). Steam é fonte de detecção, nunca dependência do limiter.
       jitter ~0.4ms sob cap 60; validado focado no Windows).
 - [x] **H — testar 30/40/45/60/72/90/120** (alvo via CLI, matriz validada
       no Windows).
-- [ ] **I — núcleo em Rust** (`core/`).
-- [ ] **J — UI Tauri** (overlay minimalista, sem roubar foco).
-- [ ] **K — hotkey + gamepad**.
-- [ ] **L — detecção Steam/processos**.
-- [ ] **M — profiles** (memorizar último limite por jogo).
-- [ ] **N — sugestões inteligentes** (pós-MVP).
+- [~] **I — injector** (`injector.exe` via CreateRemoteThread; validar no
+      Control DX11, sem anti-cheat).
+- [ ] **J — descoberta automática** (pescar swapchain na criação; aposenta
+      o setter).
+- [ ] **K — núcleo em Rust** (`core/`).
+- [ ] **L — UI Tauri** (overlay minimalista, sem roubar foco).
+- [ ] **M — hotkey + gamepad**.
+- [ ] **N — detecção Steam/processos**.
+- [ ] **O — profiles** (memorizar último limite por jogo).
+- [ ] **P — sugestões inteligentes** (pós-MVP).
 
 MVP 1.0: toggle, slider, presets, hotkey, gamepad, detecção do processo,
 iniciar com o Windows.
@@ -67,7 +71,7 @@ iniciar com o Windows.
 4. **Subsystem GUI via `exe.subsystem = .Windows`** no `build.zig`.
 5. **Zig linka libc++ (não libstdc++)**: ok para o PoC. Reavaliar se o hook
    futuro exigir ABI específica.
-6. **Começar em C++, núcleo em Rust depois** (Etapa I): menos variáveis no PoC.
+6. **Começar em C++, núcleo em Rust depois** (Etapa K): menos variáveis no PoC.
    O `core/` será Rust (vira crate usada direto pelo Tauri, zero FFI);
    o hook em `native/` fica C++. Zig é compilador, não linguagem do produto.
 7. **Sem Steam/profiles/Tauri/gamepad/DX12/Vulkan até o pacing estar provado.**

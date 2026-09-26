@@ -1,4 +1,4 @@
-# Tauri — overlay/UI (planejado, Etapa J)
+# Tauri — overlay/UI (planejado, Etapa L)
 
 > Status: **não existe código ainda**.
 
@@ -25,3 +25,6 @@ Interface propositalmente minimalista (conceito):
   com o Windows (opção).
 * A UI só fala com o `core/` (ver `docs/CORE.md`) — nunca com o backend
   nativo diretamente.
+* **Aviso anti-cheat obrigatório**: banner claro de risco de ban + recomendação
+  de nunca usar em jogos com anti-cheat (EAC/BE/Vanguard). Injeção só sob ação
+  do usuário ou em jogos permitidos; nunca tocar processo protegido.

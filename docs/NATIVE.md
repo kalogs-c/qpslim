@@ -14,7 +14,7 @@ native/
 ├── limiter/           # limiter.dll: DllMain + exports + hook de Present
 ├── graphics-api/
 │   └── dx11/main.cpp  # harness de teste (Etapa A) — descartável no longo prazo
-└── injector/          # (futuro) injector.exe: carrega a DLL no jogo
+└── injector/          # injector.exe: CreateRemoteThread + LoadLibrary (Etapa I)
 ```
 
 ## Build
@@ -78,7 +78,15 @@ explícita pelo host.
 Limitação conhecida (Stage C): um patch cobre todas as swapchains da mesma
 classe COM, mas outra classe (ex.: segunda janela via `IDXGISwapChain1`) tem
 vtable própria e fica de fora. Cobertura multi-classe vem com a descoberta
-automática, fora desta etapa.
+automática (Etapa J).
+
+## Injector (Etapa I)
+
+CLI: `injector.exe <pid> <caminho-da-dll>` — `OpenProcess` → `VirtualAllocEx`
+→ `WriteProcessMemory` → `CreateRemoteThread` em `LoadLibraryW`, com
+`SeDebugPrivilege`, checagem x64↔x64 e exit code por falha. Validação no
+Control (DX11, sem anti-cheat): `ATTACH` no DebugView, jogo segue rodando,
+saída limpa. Nunca em jogo com anti-cheat — ver requisito em `docs/TAURI.md`.
 
 ## Medição (Etapa D)
 
