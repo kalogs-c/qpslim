@@ -180,6 +180,18 @@ HMODULE TryLoadLimiter() {
   return limiter;
 }
 
+void TryApplyTargetFps(HMODULE limiter) {
+  auto set_target = GetLimiterProc<Limiter_SetTargetFpsFn>(
+      limiter, "Limiter_SetTargetFps");
+  if (!set_target) {
+    return;
+  }
+  set_target(kTargetFps);
+  char msg[64];
+  snprintf(msg, sizeof(msg), "limiter target: %d FPS", kTargetFps);
+  Log(msg);
+}
+
 bool TryHookPresent(HMODULE limiter) {
   if (!limiter) {
     return false;
@@ -198,14 +210,7 @@ bool TryHookPresent(HMODULE limiter) {
     Log("present hook failed.");
     return false;
   }
-  auto set_target = GetLimiterProc<Limiter_SetTargetFpsFn>(
-      limiter, "Limiter_SetTargetFps");
-  if (set_target) {
-    set_target(kTargetFps);
-    char msg[64];
-    snprintf(msg, sizeof(msg), "limiter target: %d FPS", kTargetFps);
-    Log(msg);
-  }
+  TryApplyTargetFps(limiter);
   return true;
 }
 

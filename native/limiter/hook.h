@@ -1,6 +1,7 @@
 // Present hook (Stage C): swaps the Present slot in the swapchain's
-// vtable, forwards every call to the saved original. No limiting yet.
+// vtable, forwards every call to the saved original.
 // Stage D: timestamps every Present into a ring buffer for stats.
+// Stage E: naive frame cap via Sleep-to-deadline.
 #pragma once
 
 #include <dxgi.h>

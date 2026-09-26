@@ -51,12 +51,13 @@ void WaitForDeadline(uint64_t now) {
     g_next_deadline = now + g_interval_ticks;
     return;
   }
-  if (now < g_next_deadline) {
-    uint64_t wait_ms =
-        (g_next_deadline - now) * 1000 / g_qpc_freq;
-    if (wait_ms > 0) {
-      Sleep(static_cast<DWORD>(wait_ms));
-    }
+  if (now >= g_next_deadline) {
+    g_next_deadline += g_interval_ticks;
+    return;
+  }
+  uint64_t wait_ms = (g_next_deadline - now) * 1000 / g_qpc_freq;
+  if (wait_ms > 0) {
+    Sleep(static_cast<DWORD>(wait_ms));
   }
   g_next_deadline += g_interval_ticks;
 }
@@ -97,12 +98,12 @@ bool WriteVtableSlot(void** vtable, int index, void* value) {
 } // namespace
 
 void SetTargetFps(int fps) {
+  g_next_deadline = 0;
   if (fps <= 0 || g_qpc_freq == 0) {
     g_interval_ticks = 0;
-  } else {
-    g_interval_ticks = g_qpc_freq / static_cast<uint64_t>(fps);
+    return;
   }
-  g_next_deadline = 0;
+  g_interval_ticks = g_qpc_freq / static_cast<uint64_t>(fps);
 }
 
 bool HookSwapChain(IDXGISwapChain* swapchain) {
