@@ -24,6 +24,9 @@ LONG64 g_present_count = 0;
 uint64_t g_frametimes[STATS_WINDOW] = {};
 uint64_t g_prev_ticks = 0;
 uint64_t g_qpc_freq = 0;
+// Naive cap (Stage E): frame interval in ticks, 0 = unlimited.
+uint64_t g_interval_ticks = 0;
+uint64_t g_next_deadline = 0;
 
 void LogCount(LONG64 count) {
   char msg[64];
@@ -36,6 +39,26 @@ void RecordPresentTick(uint64_t ticks, LONG64 count) {
     g_frametimes[(count - 1) % STATS_WINDOW] = ticks - g_prev_ticks;
   }
   g_prev_ticks = ticks;
+}
+
+// Deliberately naive: coarse Sleep, truncated sub-ms, no drift correction.
+// Good pacing is Stage G's problem.
+void WaitForDeadline(uint64_t now) {
+  if (g_interval_ticks == 0) {
+    return;
+  }
+  if (g_next_deadline == 0) {
+    g_next_deadline = now + g_interval_ticks;
+    return;
+  }
+  if (now < g_next_deadline) {
+    uint64_t wait_ms =
+        (g_next_deadline - now) * 1000 / g_qpc_freq;
+    if (wait_ms > 0) {
+      Sleep(static_cast<DWORD>(wait_ms));
+    }
+  }
+  g_next_deadline += g_interval_ticks;
 }
 
 HRESULT STDMETHODCALLTYPE HookedPresent(IDXGISwapChain* self, UINT sync,
@@ -52,6 +75,7 @@ HRESULT STDMETHODCALLTYPE HookedPresent(IDXGISwapChain* self, UINT sync,
   if (!original) {
     return E_UNEXPECTED;
   }
+  WaitForDeadline(static_cast<uint64_t>(now.QuadPart));
   return original(self, sync, flags);
 }
 
@@ -71,6 +95,15 @@ bool WriteVtableSlot(void** vtable, int index, void* value) {
 }
 
 } // namespace
+
+void SetTargetFps(int fps) {
+  if (fps <= 0 || g_qpc_freq == 0) {
+    g_interval_ticks = 0;
+  } else {
+    g_interval_ticks = g_qpc_freq / static_cast<uint64_t>(fps);
+  }
+  g_next_deadline = 0;
+}
 
 bool HookSwapChain(IDXGISwapChain* swapchain) {
   // Install happens once at startup; concurrent installs are the caller's job.

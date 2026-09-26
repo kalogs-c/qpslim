@@ -149,6 +149,10 @@ void ShutdownD3D() {
 typedef BOOL (*Limiter_HookSwapChainFn)(IDXGISwapChain*);
 typedef void (*Limiter_UnhookSwapChainFn)();
 typedef int (*Limiter_GetVersionFn)();
+typedef void (*Limiter_SetTargetFpsFn)(int);
+
+// Fixed cap for Stage E (no UI yet).
+constexpr int kTargetFps = 60;
 
 template <typename Fn> Fn GetLimiterProc(HMODULE limiter, const char* name) {
   // Fresh error code: GetProcAddress may leave a stale one behind.
@@ -193,6 +197,14 @@ bool TryHookPresent(HMODULE limiter) {
   if (!hook(g_swapchain)) {
     Log("present hook failed.");
     return false;
+  }
+  auto set_target = GetLimiterProc<Limiter_SetTargetFpsFn>(
+      limiter, "Limiter_SetTargetFps");
+  if (set_target) {
+    set_target(kTargetFps);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "limiter target: %d FPS", kTargetFps);
+    Log(msg);
   }
   return true;
 }

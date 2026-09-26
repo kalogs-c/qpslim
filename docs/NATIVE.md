@@ -46,11 +46,13 @@ Esperado: janela 1280x720 pulsante, `FPS: NNN` no título, resize ok, ESC fecha.
 Logs saem via `OutputDebugString` (DebugView) — base para comparar contagem
 interna vs. contagem do hook (Etapas C/D).
 
-## limiter.dll (Etapa C)
+## limiter.dll (Etapa E)
 
-Esqueleto + hook de `Present`: `DllMain` mínimo (só log + `DisableThreadLibraryCalls`),
-exports `Limiter_GetVersion()` / `Limiter_HookSwapChain()` /
-`Limiter_UnhookSwapChain()`.
+Esqueleto + hook + **cap ingênuo**: `Limiter_SetTargetFps(int)` (`0` = livre)
+arma `intervalo = freq/fps`; cada `Present` dorme o restante até o deadline
+(`Sleep`, ms truncados) e o deadline sempre avança um intervalo — sem
+rajada de catch-up. Sem correção de drift, sem spin: pacing bom é a Etapa G.
+O teste fixa 60 FPS via `kTargetFps` após o hook.
 
 O hook (`hook.h`/`hook.cpp`) troca o slot 8 da vtable da swapchain pelo nosso
 `HookedPresent`, que conta (atômico), repassa ao original e volta. Log no

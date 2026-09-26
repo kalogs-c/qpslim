@@ -16,3 +16,7 @@ void UnhookSwapChain();
 
 // Fills out with stats over the recent window. False when empty.
 bool GetPresentStats(LimiterStats* out);
+
+// Sets the frame rate cap in FPS. 0 (or negative) means unlimited.
+// Takes effect on subsequent presents; re-arms the deadline.
+void SetTargetFps(int fps);

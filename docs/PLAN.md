@@ -7,8 +7,8 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | D em validação — medição compila, falta rodar no Windows |
-| Última atualização | 2026-09-21 |
+| Etapa atual | E validada no Windows — próxima F (verificação sob cap) |
+| Última atualização | 2026-09-25 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
 
@@ -16,7 +16,7 @@
 
 | Camada | Doc | Estado |
 |---|---|---|
-| `native/` — hook DLL, pacer, injector (C++) | `docs/NATIVE.md` | PoC em andamento (Etapa A feita) |
+| `native/` — hook DLL, pacer, injector (C++) | `docs/NATIVE.md` | PoC em andamento (Etapas A–E feitas) |
 | `core/` — Limiter API, profiles, detecção (Rust) | `docs/CORE.md` | Planejado (Etapa I) |
 | `app/` — overlay/UI (Tauri) | `docs/TAURI.md` | Planejado (Etapa J) |
 
@@ -36,10 +36,9 @@ correta). Steam é fonte de detecção, nunca dependência do limiter.
 - [x] **B — DLL esqueleto** (ATTACH/DETACH validados no Windows).
 - [x] **C — hook de `IDXGISwapChain::Present`** (hook + review fixes de
       race/ABI, commitado).
-- [~] **D — contar/medir Presents** (compila; comparação DLL-vs-app pendente
-      de validação).
-- [ ] **D — contar/medir Presents**.
-- [ ] **E — limiter extremamente simples** (só provar o conceito).
+- [x] **D — contar/medir Presents** (ring QPC + `Limiter_GetStats`,
+      validado no Windows).
+- [x] **E — limiter extremamente simples** (cap ingênuo, validado no Windows).
 - [ ] **F — medir FPS e frametime**.
 - [ ] **G — melhorar frame pacing** (QPC, deadlines absolutos, drift, sleep +
       espera de alta precisão).
