@@ -21,7 +21,7 @@ test "empty or invalid input returns false" {
     var n: u64 = 0;
     try std.testing.expect(!WindowBounds(0, window, &first, &n));
     try std.testing.expect(!WindowBounds(1, window, &first, &n));
-    try std.testing.expect(!StatsCompute(&.{}, 0, freq, 10, &out));
+    try std.testing.expect(!StatsCompute(&[_]u64{}, 0, freq, 10, &out));
     try std.testing.expect(!StatsCompute(&.{tick_60}, 1, 0, 10, &out));
 }
 
