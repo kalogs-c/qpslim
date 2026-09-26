@@ -74,6 +74,9 @@ ring buffer de 240 amostras (sem alocação/lock no caminho quente — só intei
 frametime_max_ms }` sobre a janela; o teste lê a cada 2s e cruza com o
 próprio contador. Single-writer, leitor ocasional, diagnóstico.
 
+Baseline sob cap 60 (run Windows): `avg≈16.65ms`, `max≈31.6ms` sistemático
+(quantum do timer) — é o que a Etapa G precisa eliminar.
+
 ## Testes
 
 `mise run test` (da raiz) roda `common/stats_test.zig` no host via

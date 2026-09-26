@@ -7,7 +7,7 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | E validada no Windows — próxima F (verificação sob cap) |
+| Etapa atual | F validada no Windows — próxima G (frame pacing) |
 | Última atualização | 2026-09-25 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
@@ -39,7 +39,8 @@ correta). Steam é fonte de detecção, nunca dependência do limiter.
 - [x] **D — contar/medir Presents** (ring QPC + `Limiter_GetStats`,
       validado no Windows).
 - [x] **E — limiter extremamente simples** (cap ingênuo, validado no Windows).
-- [ ] **F — medir FPS e frametime**.
+- [x] **F — medir FPS e frametime** (DLL-vs-app < 1%; baseline sob cap 60:
+      `avg≈16.65ms`, `max≈31.6ms` sistemático por quantum do timer).
 - [ ] **G — melhorar frame pacing** (QPC, deadlines absolutos, drift, sleep +
       espera de alta precisão).
 - [ ] **H — testar 30/40/45/60/72/90/120**.
