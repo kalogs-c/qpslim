@@ -1,6 +1,7 @@
 // Native backend build (C++). Run from native/:  zig build
 // Cross-compiles x86_64-windows-gnu. Output: zig-out/bin/
-// Targets: dx11-test.exe (test harness), limiter.dll (hook backend).
+// Targets: dx11-test.exe (test harness), injector.exe (test tool),
+// limiter.dll (hook backend).
 
 const std = @import("std");
 
@@ -11,6 +12,26 @@ fn newCxxModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
         .target = target,
         .optimize = optimize,
     });
+}
+
+fn addCxxExecutable(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8, sources: []const []const u8, syslibs: []const []const u8) *std.Build.Step.Compile {
+    const exe = b.addExecutable(.{
+        .name = name,
+        .root_module = newCxxModule(b, target, optimize),
+    });
+    for (sources) |src| {
+        exe.root_module.addCSourceFile(.{
+            .file = b.path(src),
+            .flags = &cxx_flags,
+        });
+    }
+    exe.root_module.link_libcpp = true;
+    exe.root_module.link_libc = true;
+    for (syslibs) |lib| {
+        exe.root_module.linkSystemLibrary(lib, .{});
+    }
+    b.installArtifact(exe);
+    return exe;
 }
 
 fn addHostTest(b: *std.Build, test_step: *std.Build.Step, optimize: std.builtin.OptimizeMode, name: []const u8, zig_src: []const u8, cpp_src: []const u8) void {
@@ -38,21 +59,10 @@ pub fn build(b: *std.Build) void {
     });
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable(.{
-        .name = "dx11-test",
-        .root_module = newCxxModule(b, target, optimize),
-    });
     const exe_sources = [_][]const u8{
         "graphics-api/dx11/main.cpp",
         "common/args.cpp",
     };
-    for (exe_sources) |src| {
-        exe.root_module.addCSourceFile(.{
-            .file = b.path(src),
-            .flags = &cxx_flags,
-        });
-    }
-    exe.root_module.link_libcpp = true;
     // System libs must be listed explicitly.
     const syslibs = [_][]const u8{
         "d3d11",    "dxgi",
@@ -61,11 +71,13 @@ pub fn build(b: *std.Build) void {
         "oleaut32", "uuid",
         "advapi32", "shell32",
     };
-    for (syslibs) |lib| {
-        exe.root_module.linkSystemLibrary(lib, .{});
-    }
+    const exe = addCxxExecutable(b, target, optimize, "dx11-test", &exe_sources, &syslibs);
     exe.subsystem = .Windows;
-    b.installArtifact(exe);
+
+    // Test-harness tool, not injected code.
+    const injector_sources = [_][]const u8{"injector/main.cpp"};
+    const injector_syslibs = [_][]const u8{ "kernel32", "shell32" };
+    _ = addCxxExecutable(b, target, optimize, "injector", &injector_sources, &injector_syslibs);
 
     const dll = b.addLibrary(.{
         .name = "limiter",
