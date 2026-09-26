@@ -4,15 +4,8 @@
 #pragma once
 
 #include <dxgi.h>
-#include <stdint.h>
 
-// Writable by C callers: plain C layout, fixed-size types only.
-struct LimiterStats {
-  uint64_t present_count;
-  double fps_avg;
-  double frametime_avg_ms;
-  double frametime_max_ms;
-};
+#include "../common/stats.h"
 
 // Patches vtable slot 8 of the given swapchain. Returns false if already
 // hooked or the patch fails. Safe to call with nullptr (returns false).

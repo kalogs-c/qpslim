@@ -34,6 +34,8 @@
 ## Build e validação
 
 * Build do nativo: `mise run build` (da raiz). Nunca commitar sem rodar.
+* Testes host: `mise run test` (matemática pura em Zig; hook/DLL seguem
+  manuais no Windows).
 * Após qualquer mudança no nativo: checar PE (`MZ`, x64, subsystem GUI,
   exports) antes de pedir validação no Windows.
 * **Commits**: nunca commitar sem pedido explícito — o usuário valida os

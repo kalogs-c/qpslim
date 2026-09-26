@@ -9,9 +9,11 @@
 native/
 ├── build.zig          # build de todos os alvos nativos
 ├── build.zig.zon      # manifesto do pacote
-├── dx11-test/         # alvo de teste do PoC (Etapa A) — descartável no longo prazo
-│   └── main.cpp
-├── limiter/           # limiter.dll: DllMain + exports (hook de Present a partir da C)
+├── common/            # código compartilhado, livre de plataforma
+│   ├── stats.h/.cpp   # matemática de medição (+ testes em stats_test.zig)
+├── limiter/           # limiter.dll: DllMain + exports + hook de Present
+├── graphics-api/
+│   └── dx11/main.cpp  # harness de teste (Etapa A) — descartável no longo prazo
 └── injector/          # (futuro) injector.exe: carrega a DLL no jogo
 ```
 
@@ -67,8 +69,16 @@ automática, fora desta etapa.
 Cada `Present` carimba `QueryPerformanceCounter`; deltas em ticks vão para um
 ring buffer de 240 amostras (sem alocação/lock no caminho quente — só inteiros).
 `Limiter_GetStats()` devolve `{ present_count, fps_avg, frametime_avg_ms,
-frametime_max_ms }` sobre a janela; o teste lê a cada 0.5s e cruza com o
+frametime_max_ms }` sobre a janela; o teste lê a cada 2s e cruza com o
 próprio contador. Single-writer, leitor ocasional, diagnóstico.
+
+## Testes
+
+`mise run test` (da raiz) roda `common/stats_test.zig` no host via
+`zig build test`: matemática pura de `common/stats.h` (`WindowBounds`,
+`StatsCompute`) — sem Windows, sem D3D. Hook, DLL e teardown continuam
+manuais no Windows. Logs periódicos do teste saem a cada 2s para não
+inundar o DebugView.
 
 Detalhe de build: a DLL linka `kernel32` + libc mingw (headers + startup),
 **sem** `libc++` — usa só Win32 API + `<stdio.h>`, de propósito. O `dx11-test`

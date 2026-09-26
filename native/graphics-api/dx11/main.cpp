@@ -11,8 +11,9 @@
 #include <windows.h>
 
 #include <cmath>
-#include <cstdint>
 #include <cstdio>
+
+#include "../../common/stats.h"
 
 // MSVC needs explicit pragma; other toolchains link via build.zig.
 #if defined(_MSC_VER)
@@ -149,8 +150,7 @@ typedef BOOL (*Limiter_HookSwapChainFn)(IDXGISwapChain*);
 typedef void (*Limiter_UnhookSwapChainFn)();
 typedef int (*Limiter_GetVersionFn)();
 
-template <typename Fn>
-Fn GetLimiterProc(HMODULE limiter, const char* name) {
+template <typename Fn> Fn GetLimiterProc(HMODULE limiter, const char* name) {
   // Fresh error code: GetProcAddress may leave a stale one behind.
   SetLastError(0);
   return reinterpret_cast<Fn>(GetProcAddress(limiter, name));
@@ -180,8 +180,8 @@ bool TryHookPresent(HMODULE limiter) {
   if (!limiter) {
     return false;
   }
-  auto hook = GetLimiterProc<Limiter_HookSwapChainFn>(limiter,
-                                                     "Limiter_HookSwapChain");
+  auto hook =
+      GetLimiterProc<Limiter_HookSwapChainFn>(limiter, "Limiter_HookSwapChain");
   if (!hook) {
     Log("present hook export missing.");
     return false;
@@ -214,19 +214,9 @@ double SecondsBetween(const LARGE_INTEGER& from, const LARGE_INTEGER& to,
          static_cast<double>(freq.QuadPart);
 }
 
-struct LimiterStats {
-  uint64_t present_count;
-  double fps_avg;
-  double frametime_avg_ms;
-  double frametime_max_ms;
-};
-
 typedef BOOL (*Limiter_GetStatsFn)(LimiterStats*);
 
 void LogLimiterStats(HMODULE limiter, double app_fps) {
-  if (!limiter) {
-    return;
-  }
   auto get_stats =
       GetLimiterProc<Limiter_GetStatsFn>(limiter, "Limiter_GetStats");
   if (!get_stats) {
@@ -248,7 +238,7 @@ void UpdateFpsTitle(HMODULE limiter, UINT& frames_since_title,
                     LARGE_INTEGER& t_title, const LARGE_INTEGER& now,
                     const LARGE_INTEGER& freq) {
   double since_title = SecondsBetween(t_title, now, freq);
-  if (since_title < 0.5) {
+  if (since_title < 2.0) {
     return;
   }
   double fps = frames_since_title / since_title;

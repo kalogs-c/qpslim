@@ -6,6 +6,8 @@
     .paths = .{
         "build.zig",
         "build.zig.zon",
-        "dx11-test",
+        "common",
+        "graphics-api",
+        "limiter",
     },
 }

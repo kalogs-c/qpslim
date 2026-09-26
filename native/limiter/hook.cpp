@@ -118,26 +118,14 @@ bool GetPresentStats(LimiterStats* out) {
   }
   // Single writer (hook), occasional reader: plain reads, diagnostics-only.
   uint64_t count = static_cast<uint64_t>(g_present_count);
-  if (count < 2) {
+  uint64_t first = 0;
+  uint64_t n = 0;
+  if (!WindowBounds(count, STATS_WINDOW, &first, &n)) {
     return false;
   }
-  // count-1 deltas stored (the first Present only arms the clock).
-  uint64_t available = count - 1;
-  uint64_t window = available < STATS_WINDOW ? available : STATS_WINDOW;
-  uint64_t sum = 0;
-  uint64_t max = 0;
-  for (uint64_t present = count - window + 1; present <= count; present++) {
-    uint64_t delta = g_frametimes[(present - 1) % STATS_WINDOW];
-    sum += delta;
-    if (delta > max) {
-      max = delta;
-    }
+  uint64_t window[STATS_WINDOW] = {};
+  for (uint64_t p = first; p < first + n; p++) {
+    window[p - first] = g_frametimes[(p - 1) % STATS_WINDOW];
   }
-  double avg_ticks = static_cast<double>(sum) / static_cast<double>(window);
-  double freq = static_cast<double>(g_qpc_freq);
-  out->present_count = count;
-  out->fps_avg = freq / avg_ticks;
-  out->frametime_avg_ms = avg_ticks * 1000.0 / freq;
-  out->frametime_max_ms = static_cast<double>(max) * 1000.0 / freq;
-  return true;
+  return StatsCompute(window, n, g_qpc_freq, count, out);
 }

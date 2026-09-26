@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
         .root_module = newCxxModule(b, target, optimize),
     });
     exe.root_module.addCSourceFile(.{
-        .file = b.path("dx11-test/main.cpp"),
+        .file = b.path("graphics-api/dx11/main.cpp"),
         .flags = &cxx_flags,
     });
     exe.root_module.link_libcpp = true;
@@ -52,6 +52,7 @@ pub fn build(b: *std.Build) void {
     const dll_sources = [_][]const u8{
         "limiter/limiter.cpp",
         "limiter/hook.cpp",
+        "common/stats.cpp",
     };
     for (dll_sources) |src| {
         dll.root_module.addCSourceFile(.{
@@ -65,4 +66,22 @@ pub fn build(b: *std.Build) void {
     dll.root_module.link_libc = true;
     dll.root_module.linkSystemLibrary("kernel32", .{});
     b.installArtifact(dll);
+
+    // Host unit tests for the pure stats math (no Windows needed).
+    const stats_test = b.addTest(.{
+        .name = "stats-test",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("common/stats_test.zig"),
+            .target = b.graph.host,
+            .optimize = optimize,
+        }),
+    });
+    stats_test.root_module.addCSourceFile(.{
+        .file = b.path("common/stats.cpp"),
+        .flags = &cxx_flags,
+    });
+    stats_test.root_module.link_libcpp = true;
+    const run_stats_test = b.addRunArtifact(stats_test);
+    const test_step = b.step("test", "Run stats unit tests on the host");
+    test_step.dependOn(&run_stats_test.step);
 }

@@ -13,6 +13,11 @@ description = "Optimized build for real measurement (-Doptimize=ReleaseFast)"
 dir = "native"
 run = "zig build -Doptimize=ReleaseFast"
 
+[tasks.test]
+description = "Run stats unit tests on the host"
+dir = "native"
+run = "zig build test"
+
 [tasks.clean]
 description = "Remove build artifacts"
 run = "rm -rf native/zig-out native/zig-cache build"
