@@ -1,6 +1,8 @@
 // Present hook via vtable slot patch.
 #include "hook.h"
 
+#include "mem.h"
+
 #include "../common/pacer.h"
 
 #define WIN32_LEAN_AND_MEAN
@@ -32,6 +34,17 @@ ClassHook g_classes[MAX_HOOKED_CLASSES] = {};
 int g_class_count = 0;
 LONG64 g_rejected_count = 0;
 LONG64 g_present_count = 0;
+
+// Index of a hooked class, or -1. Single lookup for install and forward.
+int FindClassIndex(void** vtable) {
+  for (int i = 0; i < g_class_count; i++) {
+    if (g_classes[i].vtable == vtable) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 // Ring buffer of QPC deltas (ticks, integer-only on the hot path).
 // g_present_count doubles as total and as ring index (count % N).
 uint64_t g_frametimes[STATS_WINDOW] = {};
@@ -42,11 +55,14 @@ uint64_t g_interval_ticks = 0;
 uint64_t g_next_deadline = 0;
 // Configured target; applied whenever frequency is known.
 int g_target_fps = DEFAULT_TARGET_FPS;
-// Last stretch covered by QPC spin, not Sleep.
+// Last stretch covered by QPC spin.
 uint64_t g_spin_margin_ticks = 0;
 bool g_timer_high_res = false;
 
 void LogCount(LONG64 count) {
+  if (count % LOG_EVERY_N_PRESENTS != 0) {
+    return;
+  }
   char msg[64];
   snprintf(msg, sizeof(msg), "limiter: present #%lld", count);
   OutputDebugStringA(msg);
@@ -105,13 +121,11 @@ void WaitForDeadline(uint64_t now) {
 }
 
 PresentFn FindOriginal(IDXGISwapChain* self) {
-  void** vtable = *reinterpret_cast<void***>(self);
-  for (int i = 0; i < g_class_count; i++) {
-    if (g_classes[i].vtable == vtable) {
-      return g_classes[i].original;
-    }
+  int index = FindClassIndex(*reinterpret_cast<void***>(self));
+  if (index < 0) {
+    return nullptr;
   }
-  return nullptr;
+  return g_classes[index].original;
 }
 
 void LogRejected(void** vtable) {
@@ -133,30 +147,13 @@ HRESULT STDMETHODCALLTYPE HookedPresent(IDXGISwapChain* self, UINT sync,
   QueryPerformanceCounter(&now);
   LONG64 count = InterlockedIncrement64(&g_present_count);
   RecordPresentTick(static_cast<uint64_t>(now.QuadPart), count);
-  if (count % LOG_EVERY_N_PRESENTS == 0) {
-    LogCount(count);
-  }
+  LogCount(count);
   if (!original) {
     LogRejected(*reinterpret_cast<void***>(self));
     return E_UNEXPECTED;
   }
   WaitForDeadline(static_cast<uint64_t>(now.QuadPart));
   return original(self, sync, flags);
-}
-
-bool WriteVtableSlot(void** vtable, int index, void* value) {
-  DWORD old_protect = 0;
-  if (!VirtualProtect(&vtable[index], sizeof(void*), PAGE_READWRITE,
-                      &old_protect)) {
-    return false;
-  }
-  vtable[index] = value;
-  if (!VirtualProtect(&vtable[index], sizeof(void*), old_protect,
-                      &old_protect)) {
-    OutputDebugStringA("limiter: warning, vtable slot left writable");
-  }
-  FlushInstructionCache(GetCurrentProcess(), &vtable[index], sizeof(void*));
-  return true;
 }
 
 } // namespace
@@ -185,41 +182,51 @@ bool HookSwapChain(IDXGISwapChain* swapchain) {
     return false;
   }
   void** vtable = *reinterpret_cast<void***>(swapchain);
-  for (int i = 0; i < g_class_count; i++) {
-    if (g_classes[i].vtable == vtable) {
+  int index = FindClassIndex(vtable);
+  bool fresh = false;
+  if (index >= 0) {
+    // Known class: re-patch only if the slot was restored (e.g. after
+    // unhook); otherwise already covered.
+    if (vtable[PRESENT_VTABLE_INDEX] ==
+        reinterpret_cast<void*>(&HookedPresent)) {
       return true;
     }
+  } else {
+    if (g_class_count >= MAX_HOOKED_CLASSES) {
+      OutputDebugStringA("limiter: class table full, swapchain not hooked");
+      return false;
+    }
+    // Store before patching: any thread reaching HookedPresent from here on
+    // must see a valid original.
+    index = g_class_count++;
+    g_classes[index].vtable = vtable;
+    g_classes[index].original =
+        reinterpret_cast<PresentFn>(vtable[PRESENT_VTABLE_INDEX]);
+    fresh = true;
   }
-  if (g_class_count >= MAX_HOOKED_CLASSES) {
-    OutputDebugStringA("limiter: class table full, swapchain not hooked");
-    return false;
-  }
-  // Store before patching: any thread reaching HookedPresent from here on
-  // must see a valid original.
-  g_classes[g_class_count].vtable = vtable;
-  g_classes[g_class_count].original =
-      reinterpret_cast<PresentFn>(vtable[PRESENT_VTABLE_INDEX]);
   LARGE_INTEGER freq = {};
   if (QueryPerformanceFrequency(&freq)) {
     g_qpc_freq = static_cast<uint64_t>(freq.QuadPart);
   }
   ApplyTarget();
   MemoryBarrier();
-  if (!WriteVtableSlot(vtable, PRESENT_VTABLE_INDEX,
-                       reinterpret_cast<void*>(&HookedPresent))) {
-    g_classes[g_class_count].vtable = nullptr;
-    g_classes[g_class_count].original = nullptr;
+  if (!WriteProtected(&vtable[PRESENT_VTABLE_INDEX],
+                      reinterpret_cast<void*>(&HookedPresent))) {
+    if (fresh) {
+      g_class_count--;
+      g_classes[index].vtable = nullptr;
+      g_classes[index].original = nullptr;
+    }
     return false;
   }
-  g_class_count++;
   OutputDebugStringA("limiter: present hooked, slot patched");
   return true;
 }
 
 void UnhookSwapChain() {
   for (int i = 0; i < g_class_count; i++) {
-    WriteVtableSlot(g_classes[i].vtable, PRESENT_VTABLE_INDEX,
-                    reinterpret_cast<void*>(g_classes[i].original));
+    WriteProtected(&g_classes[i].vtable[PRESENT_VTABLE_INDEX],
+                   reinterpret_cast<void*>(g_classes[i].original));
   }
   // Entries intentionally kept: in-flight HookedPresent calls still route
   // through them, and DXGI code is always valid.
