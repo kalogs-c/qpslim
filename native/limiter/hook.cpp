@@ -14,13 +14,23 @@
 #define LOG_EVERY_N_PRESENTS 300
 #define STATS_WINDOW 240
 #define SPIN_MARGIN_MS 2
+#define DEFAULT_TARGET_FPS 30 // Unmistakable drop on 60Hz+ displays.
 
 namespace {
 
 typedef HRESULT(STDMETHODCALLTYPE* PresentFn)(IDXGISwapChain*, UINT, UINT);
 
-void** g_vtable = nullptr;
-PresentFn g_original_present = nullptr;
+// One entry per hooked swapchain class (vtables are static per COM class,
+// so one patch covers every instance — past and future). Entries are never
+// removed: in-flight calls after unhook still route to valid DXGI code.
+#define MAX_HOOKED_CLASSES 4
+struct ClassHook {
+  void** vtable;
+  PresentFn original;
+};
+ClassHook g_classes[MAX_HOOKED_CLASSES] = {};
+int g_class_count = 0;
+LONG64 g_rejected_count = 0;
 LONG64 g_present_count = 0;
 // Ring buffer of QPC deltas (ticks, integer-only on the hot path).
 // g_present_count doubles as total and as ring index (count % N).
@@ -30,6 +40,8 @@ uint64_t g_qpc_freq = 0;
 // Frame cap interval in ticks, 0 = unlimited.
 uint64_t g_interval_ticks = 0;
 uint64_t g_next_deadline = 0;
+// Configured target; applied whenever frequency is known.
+int g_target_fps = DEFAULT_TARGET_FPS;
 // Last stretch covered by QPC spin, not Sleep.
 uint64_t g_spin_margin_ticks = 0;
 bool g_timer_high_res = false;
@@ -92,10 +104,31 @@ void WaitForDeadline(uint64_t now) {
   g_next_deadline = AdvanceDeadline(g_next_deadline, g_interval_ticks, now);
 }
 
+PresentFn FindOriginal(IDXGISwapChain* self) {
+  void** vtable = *reinterpret_cast<void***>(self);
+  for (int i = 0; i < g_class_count; i++) {
+    if (g_classes[i].vtable == vtable) {
+      return g_classes[i].original;
+    }
+  }
+  return nullptr;
+}
+
+void LogRejected(void** vtable) {
+  LONG64 rejected = InterlockedIncrement64(&g_rejected_count);
+  if (rejected == 1 || rejected % LOG_EVERY_N_PRESENTS == 0) {
+    char msg[96];
+    snprintf(msg, sizeof(msg),
+             "limiter: rejected present #%lld (unknown vtable %p)",
+             rejected, vtable);
+    OutputDebugStringA(msg);
+  }
+}
+
 HRESULT STDMETHODCALLTYPE HookedPresent(IDXGISwapChain* self, UINT sync,
                                         UINT flags) {
   // Snapshot: install may run concurrently on another thread.
-  PresentFn original = g_original_present;
+  PresentFn original = FindOriginal(self);
   LARGE_INTEGER now = {};
   QueryPerformanceCounter(&now);
   LONG64 count = InterlockedIncrement64(&g_present_count);
@@ -104,6 +137,7 @@ HRESULT STDMETHODCALLTYPE HookedPresent(IDXGISwapChain* self, UINT sync,
     LogCount(count);
   }
   if (!original) {
+    LogRejected(*reinterpret_cast<void***>(self));
     return E_UNEXPECTED;
   }
   WaitForDeadline(static_cast<uint64_t>(now.QuadPart));
@@ -127,55 +161,69 @@ bool WriteVtableSlot(void** vtable, int index, void* value) {
 
 } // namespace
 
-void SetTargetFps(int fps) {
-  g_next_deadline = 0;
-  if (fps <= 0 || g_qpc_freq == 0) {
+void ApplyTarget() {
+  if (g_target_fps <= 0 || g_qpc_freq == 0) {
     g_interval_ticks = 0;
     ReleaseTimerRes();
     return;
   }
-  g_interval_ticks = g_qpc_freq / static_cast<uint64_t>(fps);
+  g_interval_ticks = g_qpc_freq / static_cast<uint64_t>(g_target_fps);
   g_spin_margin_ticks = g_qpc_freq * SPIN_MARGIN_MS / 1000;
+}
+
+void SetTargetFps(int fps) {
+  g_target_fps = fps;
+  g_next_deadline = 0;
+  ApplyTarget();
 }
 
 bool HookSwapChain(IDXGISwapChain* swapchain) {
   // Install happens once at startup; concurrent installs are the caller's job.
-  // DXGI vtables are static per COM class, so one patch misses other classes
-  // (e.g. IDXGISwapChain1 has its own vtable).
-  if (!swapchain || g_vtable) {
+  // DXGI vtables are static per COM class: one patch covers every instance
+  // of that class, and each new class is adopted on sight (up to the table).
+  if (!swapchain) {
     return false;
   }
   void** vtable = *reinterpret_cast<void***>(swapchain);
+  for (int i = 0; i < g_class_count; i++) {
+    if (g_classes[i].vtable == vtable) {
+      return true;
+    }
+  }
+  if (g_class_count >= MAX_HOOKED_CLASSES) {
+    OutputDebugStringA("limiter: class table full, swapchain not hooked");
+    return false;
+  }
   // Store before patching: any thread reaching HookedPresent from here on
   // must see a valid original.
-  g_vtable = vtable;
-  g_original_present =
+  g_classes[g_class_count].vtable = vtable;
+  g_classes[g_class_count].original =
       reinterpret_cast<PresentFn>(vtable[PRESENT_VTABLE_INDEX]);
   LARGE_INTEGER freq = {};
   if (QueryPerformanceFrequency(&freq)) {
     g_qpc_freq = static_cast<uint64_t>(freq.QuadPart);
   }
+  ApplyTarget();
   MemoryBarrier();
   if (!WriteVtableSlot(vtable, PRESENT_VTABLE_INDEX,
                        reinterpret_cast<void*>(&HookedPresent))) {
-    g_vtable = nullptr;
-    g_original_present = nullptr;
+    g_classes[g_class_count].vtable = nullptr;
+    g_classes[g_class_count].original = nullptr;
     return false;
   }
+  g_class_count++;
   OutputDebugStringA("limiter: present hooked, slot patched");
   return true;
 }
 
 void UnhookSwapChain() {
-  if (!g_vtable) {
-    return;
+  for (int i = 0; i < g_class_count; i++) {
+    WriteVtableSlot(g_classes[i].vtable, PRESENT_VTABLE_INDEX,
+                    reinterpret_cast<void*>(g_classes[i].original));
   }
-  WriteVtableSlot(g_vtable, PRESENT_VTABLE_INDEX,
-                  reinterpret_cast<void*>(g_original_present));
-  g_vtable = nullptr;
+  // Entries intentionally kept: in-flight HookedPresent calls still route
+  // through them, and DXGI code is always valid.
   ReleaseTimerRes();
-  // g_original_present intentionally kept: in-flight HookedPresent calls
-  // still route through it, and DXGI code is always valid.
   OutputDebugStringA("limiter: present unhooked, slot restored");
 }
 
