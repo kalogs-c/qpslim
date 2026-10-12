@@ -87,6 +87,7 @@ pub fn build(b: *std.Build) void {
     const dll_sources = [_][]const u8{
         "limiter/limiter.cpp",
         "limiter/hook.cpp",
+        "limiter/discover.cpp",
         "common/stats.cpp",
         "common/pacer.cpp",
     };

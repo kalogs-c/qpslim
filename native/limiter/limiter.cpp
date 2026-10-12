@@ -1,11 +1,12 @@
-// limiter.dll — version + hook control + frame cap.
-// The hook itself lives in hook.cpp. Win32 API only (no STL):
-// keeps libc/libc++ out of the DLL.
+// limiter.dll — version + hook control + frame cap + creation discovery.
+// Hooks live in hook.cpp (Present) and discover.cpp (creation).
+// Win32 API only (no STL): keeps libc/libc++ out of the DLL.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #include "hook.h"
+#include "discover.h"
 
 #define LIMITER_VERSION 1
 
@@ -28,6 +29,14 @@ extern "C" __declspec(dllexport) BOOL Limiter_GetStats(LimiterStats* out) {
 
 extern "C" __declspec(dllexport) void Limiter_SetTargetFps(int fps) {
   SetTargetFps(fps);
+}
+
+extern "C" __declspec(dllexport) BOOL Limiter_HookCreation() {
+  return HookSwapChainCreation() ? TRUE : FALSE;
+}
+
+extern "C" __declspec(dllexport) void Limiter_UnhookCreation() {
+  UnhookSwapChainCreation();
 }
 
 BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
