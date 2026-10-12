@@ -10,8 +10,11 @@ native/
 ├── build.zig          # build de todos os alvos nativos
 ├── build.zig.zon      # manifesto do pacote
 ├── common/            # código compartilhado, livre de plataforma
-│   ├── stats.h/.cpp   # matemática de medição (+ testes em stats_test.zig)
-├── limiter/           # limiter.dll: DllMain + exports + hook de Present
+│   ├── stats.h/.cpp   # matemática de medição (+ stats_test.zig)
+│   ├── pacer.h/.cpp   # matemática do pacer (+ pacer_test.zig)
+│   ├── args.h/.cpp    # parse de CLI (+ args_test.zig)
+├── limiter/           # limiter.dll: DllMain + exports, hook (hook.*),
+│                      # descoberta (discover.*), escrita protegida (mem.h)
 ├── graphics-api/
 │   └── dx11/main.cpp  # harness de teste (Etapa A) — descartável no longo prazo
 └── injector/          # injector.exe: CreateRemoteThread + LoadLibrary (Etapa I)

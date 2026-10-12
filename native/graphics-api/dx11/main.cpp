@@ -261,7 +261,7 @@ void UpdateFpsTitle(HMODULE limiter, UINT& frames_since_title,
   _snwprintf_s(title, _countof(title), _TRUNCATE,
                L"dx11-test — FPS: %.0f (no VSYNC)", fps);
   SetWindowTextW(g_hwnd, title);
-  // Also visible in DebugView; basis for hook-count comparison later.
+  // Also visible in DebugView; cross-check against hook-side counts.
   char logbuf[128];
   snprintf(logbuf, sizeof(logbuf), "Present frames: %u in %.3fs = %.1f FPS",
            frames_since_title, since_title, fps);

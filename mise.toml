@@ -14,7 +14,7 @@ dir = "native"
 run = "zig build -Doptimize=ReleaseFast"
 
 [tasks.test]
-description = "Run stats unit tests on the host"
+description = "Run host unit tests"
 dir = "native"
 run = "zig build test"
 
