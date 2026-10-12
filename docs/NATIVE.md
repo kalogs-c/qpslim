@@ -64,6 +64,13 @@ Espera híbrida: `timeBeginPeriod(1)` + `Sleep` do grosso + spin QPC com
 `common/pacer.{h,cpp}` (`SleepMsFor`, `AdvanceDeadline`) com testes em
 `common/pacer_test.zig`. A DLL linka `winmm` pelo timer.
 
+## Descoberta tardia (bootstrap)
+
+Como vtables são estáticas por classe, a instalação cria swapchains
+descartáveis (janela oculta 16x16, liberadas em seguida) pelos caminhos
+legado e `ForHwnd` só para aprender as classes e patchá-las — injeção tardia
+engancha instâncias já existentes na hora, sem toggle. Até 4 classes.
+
 Resultado sob cap 60 (run focado no Windows): `avg≈16.67`, `max≈17.0`,
 jitter ~0.4ms (baseline E era `max≈31.6`). Runs de medição exigem a janela
 em primeiro plano — DWM em background distorce o timing.
@@ -75,10 +82,21 @@ pelo teste na saída, antes de liberar a swapchain. O `DLL_PROCESS_DETACH`
 só loga: patch sob loader lock arrisca deadlock, então a reversão é sempre
 explícita pelo host.
 
-Limitação conhecida (Stage C): um patch cobre todas as swapchains da mesma
-classe COM, mas outra classe (ex.: segunda janela via `IDXGISwapChain1`) tem
-vtable própria e fica de fora. Cobertura multi-classe vem com a descoberta
-automática (Etapa J).
+Limitação conhecida: um patch cobre todas as swapchains da mesma classe
+COM, mas outra classe (ex.: segunda janela via `IDXGISwapChain1`) tem vtable
+própria e fica de fora. Delay-loaded d3d11 também é perdido (IAT lida uma
+vez); swapchains já existentes na instalação nunca são vistas — injetar cedo
+ou recriar o device (troca de resolução/fullscreen).
+
+## Descoberta automática (Etapa J)
+
+`discover.h/.cpp`: patch da vtable de `IDXGIFactory::CreateSwapChain`
+(slot 10) e `IDXGIFactory2::CreateSwapChainForHwnd` (slot 15, verificado
+nos headers) + IAT patch de `D3D11CreateDeviceAndSwapChain` em todos os
+módulos (via Toolhelp32); toda swapchain criada cai em `HookSwapChain` com o alvo
+armazenado (default 60). Reversão explícita via `Limiter_UnhookCreation`.
+O injector chama `Limiter_HookCreation` por segunda thread remota (fora do
+loader lock) logo após o load.
 
 ## Injector (Etapa I)
 
@@ -87,6 +105,10 @@ CLI: `injector.exe <pid> <caminho-da-dll>` — `OpenProcess` → `VirtualAllocEx
 `SeDebugPrivilege`, checagem x64↔x64 e exit code por falha. Validação no
 Control (DX11, sem anti-cheat): `ATTACH` no DebugView, jogo segue rodando,
 saída limpa. Nunca em jogo com anti-cheat — ver requisito em `docs/TAURI.md`.
+
+Incompatibilidade conhecida: overlays de terceiros no mesmo slot (ex.: Steam
+overlay) travam o jogo — coabitação adiada para o pós-MVP; overlay OFF
+obrigatório nos runs de validação.
 
 ## Medição (Etapa D)
 

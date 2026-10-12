@@ -7,7 +7,7 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | J em implementação — descoberta automática da swapchain |
+| Etapa atual | J em validação — descoberta compila, falta Control com device recriado |
 | Última atualização | 2026-09-25 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
