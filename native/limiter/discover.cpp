@@ -2,6 +2,7 @@
 #include "discover.h"
 
 #include "hook.h"
+#include "mem.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -50,16 +51,6 @@ struct IatPatch {
 };
 IatPatch g_iat_patches[MAX_IAT_PATCHES] = {};
 int g_iat_count = 0;
-
-bool ProtectWrite(void** cell, void* value) {
-  DWORD old_protect = 0;
-  if (!VirtualProtect(cell, sizeof(void*), PAGE_READWRITE, &old_protect)) {
-    return false;
-  }
-  *cell = value;
-  VirtualProtect(cell, sizeof(void*), old_protect, &old_protect);
-  return true;
-}
 
 void DiscoverSwapChain(IDXGISwapChain* swapchain) {
   if (!swapchain) {
@@ -160,19 +151,15 @@ void PatchModuleImports(BYTE* base, FARPROC real_create) {
       }
       void** cell = reinterpret_cast<void**>(&addr_thunk[i].u1.Function);
       void* original = reinterpret_cast<void*>(addr_thunk[i].u1.Function);
-      if (ProtectWrite(cell, reinterpret_cast<void*>(
-                                 &HookedCreateDeviceAndSwapChain))) {
+      if (WriteProtected(cell, reinterpret_cast<void*>(
+                                  &HookedCreateDeviceAndSwapChain))) {
         g_iat_patches[g_iat_count++] = {cell, original};
       }
     }
   }
 }
 
-} // namespace
-
-namespace {
-
-// Hidden 1x1 window, just real enough for a throwaway swapchain.
+// Hidden window, just real enough for a throwaway swapchain.
 const wchar_t* kBootstrapClass = L"QpslimBootstrap";
 
 HWND CreateHiddenWindow(HINSTANCE inst) {
@@ -265,6 +252,71 @@ void BootstrapModern(HMODULE d3d11, IDXGIFactory* factory, HWND hwnd) {
   factory2->Release();
 }
 
+void PatchAllImports(FARPROC real_create) {
+  HANDLE snap =
+      CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32,
+                               GetCurrentProcessId());
+  if (snap != INVALID_HANDLE_VALUE) {
+    MODULEENTRY32W me = {};
+    me.dwSize = sizeof(me);
+    if (Module32FirstW(snap, &me)) {
+      do {
+        PatchModuleImports(me.modBaseAddr, real_create);
+      } while (Module32NextW(snap, &me));
+    }
+    CloseHandle(snap);
+  }
+  char msg[64];
+  snprintf(msg, sizeof(msg), "limiter: IAT patched in %d module(s)",
+           g_iat_count);
+  OutputDebugStringA(msg);
+}
+
+void BootstrapClasses(HMODULE d3d11, IDXGIFactory* factory) {
+  // Before patching factory slots: throwaway swapchains teach us their
+  // classes directly, so late injection hooks existing instances.
+  // (Patch-first would route these creations through our own wrappers.)
+  HINSTANCE inst = GetModuleHandleW(nullptr);
+  HWND hwnd = CreateHiddenWindow(inst);
+  if (hwnd) {
+    BootstrapLegacy(d3d11, hwnd);
+    BootstrapModern(d3d11, factory, hwnd);
+    DestroyWindow(hwnd);
+    UnregisterClassW(kBootstrapClass, inst);
+  }
+}
+
+bool PatchFactorySlots(IDXGIFactory* factory) {
+  void** vtable = *reinterpret_cast<void***>(factory);
+  void* original = vtable[FACTORY_CREATE_SWAP_CHAIN_INDEX];
+  if (!WriteProtected(&vtable[FACTORY_CREATE_SWAP_CHAIN_INDEX],
+                      reinterpret_cast<void*>(&HookedCreateSwapChain))) {
+    return false;
+  }
+  g_factory_vtable = vtable;
+  g_original_create = reinterpret_cast<CreateSwapChainFn>(original);
+  OutputDebugStringA("limiter: factory CreateSwapChain hooked");
+
+  IDXGIFactory2* factory2 = nullptr;
+  if (SUCCEEDED(factory->QueryInterface(
+          __uuidof(IDXGIFactory2),
+          reinterpret_cast<void**>(&factory2))) &&
+      factory2) {
+    void** vtable2 = *reinterpret_cast<void***>(factory2);
+    void* original2 = vtable2[FACTORY_CREATE_SWAP_CHAIN_FOR_HWND_INDEX];
+    if (WriteProtected(&vtable2[FACTORY_CREATE_SWAP_CHAIN_FOR_HWND_INDEX],
+                       reinterpret_cast<void*>(
+                           &HookedCreateSwapChainForHwnd))) {
+      g_factory2_vtable = vtable2;
+      g_original_create_hwnd =
+          reinterpret_cast<CreateSwapChainForHwndFn>(original2);
+      OutputDebugStringA("limiter: factory CreateSwapChainForHwnd hooked");
+    }
+    factory2->Release();
+  }
+  return true;
+}
+
 } // namespace
 
 bool HookSwapChainCreation() {
@@ -290,84 +342,32 @@ bool HookSwapChainCreation() {
       !factory) {
     return false;
   }
-  HANDLE snap =
-      CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32,
-                               GetCurrentProcessId());
-  if (snap != INVALID_HANDLE_VALUE) {
-    MODULEENTRY32W me = {};
-    me.dwSize = sizeof(me);
-    if (Module32FirstW(snap, &me)) {
-      do {
-        PatchModuleImports(me.modBaseAddr, real_create);
-      } while (Module32NextW(snap, &me));
-    }
-    CloseHandle(snap);
-  }
-  char msg[64];
-  snprintf(msg, sizeof(msg), "limiter: IAT patched in %d module(s)",
-           g_iat_count);
-  OutputDebugStringA(msg);
+  PatchAllImports(real_create);
+  BootstrapClasses(d3d11, factory);
 
-  // Bootstrap before patching factory slots: throwaway swapchains teach us
-  // their classes directly, so late injection hooks existing instances.
-  // (Patch-first would route these creations through our own wrappers.)
-  HINSTANCE inst = GetModuleHandleW(nullptr);
-  HWND hwnd = CreateHiddenWindow(inst);
-  if (hwnd) {
-    BootstrapLegacy(d3d11, hwnd);
-    BootstrapModern(d3d11, factory, hwnd);
-    DestroyWindow(hwnd);
-    UnregisterClassW(kBootstrapClass, inst);
-  }
-
-  void** vtable = *reinterpret_cast<void***>(factory);
-  void* original = vtable[FACTORY_CREATE_SWAP_CHAIN_INDEX];
-  if (!ProtectWrite(&vtable[FACTORY_CREATE_SWAP_CHAIN_INDEX],
-                    reinterpret_cast<void*>(&HookedCreateSwapChain))) {
+  if (!PatchFactorySlots(factory)) {
     factory->Release();
     return false;
   }
-  g_factory_vtable = vtable;
-  g_original_create = reinterpret_cast<CreateSwapChainFn>(original);
-  OutputDebugStringA("limiter: factory CreateSwapChain hooked");
-
-  IDXGIFactory2* factory2 = nullptr;
-  if (SUCCEEDED(factory->QueryInterface(
-          __uuidof(IDXGIFactory2),
-          reinterpret_cast<void**>(&factory2))) &&
-      factory2) {
-    void** vtable2 = *reinterpret_cast<void***>(factory2);
-    void* original2 = vtable2[FACTORY_CREATE_SWAP_CHAIN_FOR_HWND_INDEX];
-    if (ProtectWrite(&vtable2[FACTORY_CREATE_SWAP_CHAIN_FOR_HWND_INDEX],
-                      reinterpret_cast<void*>(
-                          &HookedCreateSwapChainForHwnd))) {
-      g_factory2_vtable = vtable2;
-      g_original_create_hwnd =
-          reinterpret_cast<CreateSwapChainForHwndFn>(original2);
-      OutputDebugStringA("limiter: factory CreateSwapChainForHwnd hooked");
-    }
-    factory2->Release();
-  }
-
   factory->Release();
   return true;
 }
 
 void UnhookSwapChainCreation() {
   if (g_factory_vtable && g_original_create) {
-    ProtectWrite(&g_factory_vtable[FACTORY_CREATE_SWAP_CHAIN_INDEX],
-                 reinterpret_cast<void*>(g_original_create));
+    WriteProtected(&g_factory_vtable[FACTORY_CREATE_SWAP_CHAIN_INDEX],
+                   reinterpret_cast<void*>(g_original_create));
     g_factory_vtable = nullptr;
     g_original_create = nullptr;
   }
   if (g_factory2_vtable && g_original_create_hwnd) {
-    ProtectWrite(&g_factory2_vtable[FACTORY_CREATE_SWAP_CHAIN_FOR_HWND_INDEX],
-                 reinterpret_cast<void*>(g_original_create_hwnd));
+    WriteProtected(&g_factory2_vtable[FACTORY_CREATE_SWAP_CHAIN_FOR_HWND_INDEX],
+                   reinterpret_cast<void*>(g_original_create_hwnd));
     g_factory2_vtable = nullptr;
     g_original_create_hwnd = nullptr;
   }
   for (int i = 0; i < g_iat_count; i++) {
-    ProtectWrite(g_iat_patches[i].cell, g_iat_patches[i].original);
+    WriteProtected(g_iat_patches[i].cell, g_iat_patches[i].original);
   }
   g_iat_count = 0;
   OutputDebugStringA("limiter: creation hooks removed");
