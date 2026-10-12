@@ -7,24 +7,30 @@ const std = @import("std");
 
 const cxx_flags = [_][]const u8{ "-std=c++17", "-Wall", "-Wextra" };
 
-fn newCxxModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Module {
+fn newCxxModule(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Module {
     return b.createModule(.{
         .target = target,
         .optimize = optimize,
     });
 }
 
-fn addCxxExecutable(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8, sources: []const []const u8, syslibs: []const []const u8) *std.Build.Step.Compile {
+fn addCxxExecutable(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    name: []const u8,
+    sources: []const []const u8,
+    syslibs: []const []const u8,
+) *std.Build.Step.Compile {
     const exe = b.addExecutable(.{
         .name = name,
         .root_module = newCxxModule(b, target, optimize),
     });
-    for (sources) |src| {
-        exe.root_module.addCSourceFile(.{
-            .file = b.path(src),
-            .flags = &cxx_flags,
-        });
-    }
+    addCxxSources(b, exe.root_module, sources);
     exe.root_module.link_libcpp = true;
     exe.root_module.link_libc = true;
     for (syslibs) |lib| {
@@ -34,7 +40,27 @@ fn addCxxExecutable(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
     return exe;
 }
 
-fn addHostTest(b: *std.Build, test_step: *std.Build.Step, optimize: std.builtin.OptimizeMode, name: []const u8, zig_src: []const u8, cpp_src: []const u8) void {
+fn addCxxSources(
+    b: *std.Build,
+    mod: *std.Build.Module,
+    sources: []const []const u8,
+) void {
+    for (sources) |src| {
+        mod.addCSourceFile(.{
+            .file = b.path(src),
+            .flags = &cxx_flags,
+        });
+    }
+}
+
+fn addHostTest(
+    b: *std.Build,
+    test_step: *std.Build.Step,
+    optimize: std.builtin.OptimizeMode,
+    name: []const u8,
+    zig_src: []const u8,
+    cpp_src: []const u8,
+) void {
     const t = b.addTest(.{
         .name = name,
         .root_module = b.createModule(.{
@@ -43,11 +69,8 @@ fn addHostTest(b: *std.Build, test_step: *std.Build.Step, optimize: std.builtin.
             .optimize = optimize,
         }),
     });
-    t.root_module.addCSourceFile(.{
-        .file = b.path(cpp_src),
-        .flags = &cxx_flags,
-    });
     t.root_module.link_libcpp = true;
+    addCxxSources(b, t.root_module, &.{cpp_src});
     test_step.dependOn(&b.addRunArtifact(t).step);
 }
 
@@ -91,12 +114,7 @@ pub fn build(b: *std.Build) void {
         "common/stats.cpp",
         "common/pacer.cpp",
     };
-    for (dll_sources) |src| {
-        dll.root_module.addCSourceFile(.{
-            .file = b.path(src),
-            .flags = &cxx_flags,
-        });
-    }
+    addCxxSources(b, dll.root_module, &dll_sources);
 
     // kernel32 + winmm (timer resolution) + bundled mingw libc.
     // No libc++: this DLL uses Win32 API only, by design.
