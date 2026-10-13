@@ -88,9 +88,11 @@ explícita pelo host.
 
 Limitação conhecida: um patch cobre todas as swapchains da mesma classe
 COM, mas outra classe (ex.: segunda janela via `IDXGISwapChain1`) tem vtable
-própria e fica de fora. Delay-loaded d3d11 também é perdido (IAT lida uma
-vez); swapchains já existentes na instalação nunca são vistas — injetar cedo
-ou recriar o device (troca de resolução/fullscreen).
+própria e fica de fora (coberta até o teto de 4 classes). Delay-loaded d3d11
+também é perdido (IAT lida uma vez). Swapchains já existentes na instalação
+são cobertas via bootstrap com swapchains descartáveis (somente `HARDWARE`,
+sem fallback WARP) — injetar cedo ou recriar o device só importa para
+módulos delay-loaded ou VMs sem GPU.
 
 ## Descoberta automática (Etapa J)
 
@@ -146,7 +148,10 @@ carrega via `LoadLibrary("limiter.dll")` e entrega sua swapchain via
 ## Contrato futuro (a partir da Etapa C)
 
 * `DllMain` mínimo: só log + `DisableThreadLibraryCalls` (loader lock).
-* API: `enable()` / `disable()` / `set_target_fps(n)` — a UI nunca fala com o
-  backend diretamente (ver `docs/CORE.md`).
+* API exportada: `Limiter_HookSwapChain` / `Limiter_UnhookSwapChain` /
+  `Limiter_SetTargetFps(n)` / `Limiter_GetStats` /
+  `Limiter_HookCreation` / `Limiter_UnhookCreation` (+ controle via pipe
+  na Etapa K) — a UI nunca fala com o backend diretamente
+  (ver `docs/CORE.md`).
 * Sem dependência da Steam; alvo de teste exclusivo é o `dx11-test` até o
   pacing estar provado. Sem anti-cheat/DRM — ver `docs/PLAN.md` §9.
