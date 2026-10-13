@@ -4,3 +4,5 @@ zig-cache/
 .cache/
 *.user
 .vs/
+core/target
+core/Cargo.lock

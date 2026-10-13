@@ -1,0 +1,6 @@
+[package]
+name = "qpslim-core"
+version = "0.1.0"
+edition = "2021"
+description = "Product logic between the UI and the native limiter backend"
+license = "MIT"
