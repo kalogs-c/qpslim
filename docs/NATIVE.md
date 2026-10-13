@@ -16,7 +16,8 @@ native/
 ├── limiter/           # limiter.dll: DllMain + exports, hook (hook.*),
 │                      # descoberta (discover.*), escrita protegida (mem.h)
 ├── graphics-api/
-│   └── dx11/main.cpp  # harness de teste (Etapa A) — descartável no longo prazo
+│   ├── dx11/main.cpp  # harness de teste (Etapa A) — descartável no longo prazo
+│   └── dx11-inject/main.cpp  # game-like p/ validar injector+descoberta (J)
 └── injector/          # injector.exe: CreateRemoteThread + LoadLibrary (Etapa I)
 ```
 
@@ -108,6 +109,11 @@ CLI: `injector.exe <pid> <caminho-da-dll>` — `OpenProcess` → `VirtualAllocEx
 `SeDebugPrivilege`, checagem x64↔x64 e exit code por falha. Validação no
 Control (DX11, sem anti-cheat): `ATTACH` no DebugView, jogo segue rodando,
 saída limpa. Nunca em jogo com anti-cheat — ver requisito em `docs/TAURI.md`.
+
+Loop local determinístico (sem jogo): `inject-test.exe` começa sem device —
+injete, tecle `C` (via IAT) ou `V` (via factory), `R` recria, título mostra
+`HOOKED` + FPS travado. Cada cenário da J vira tecla. Validado: engajamento,
+re-adoção e saída limpa sem jogo.
 
 Incompatibilidade conhecida: overlays de terceiros no mesmo slot (ex.: Steam
 overlay) travam o jogo — coabitação adiada para o pós-MVP; overlay OFF

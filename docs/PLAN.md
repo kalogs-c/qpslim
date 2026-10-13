@@ -7,7 +7,7 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | J em validação — descoberta compila, falta Control com device recriado |
+| Etapa atual | J validada — próxima K (núcleo Rust) |
 | Última atualização | 2026-09-25 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
@@ -47,8 +47,8 @@ correta). Steam é fonte de detecção, nunca dependência do limiter.
       no Windows).
 - [x] **I — injector** (carga remota validada em jogo real: `ATTACH`
       limpo, DLL inerte sem setter — esperado).
-- [ ] **J — descoberta automática** (pescar swapchain na criação; aposenta
-      o setter).
+- [x] **J — descoberta automática** (factory+IAT+bootstrap multi-vtable;
+      validada via `inject-test`: engajamento, re-adoção, saída limpa).
 - [ ] **K — núcleo em Rust** (`core/`).
 - [ ] **L — UI Tauri** (overlay minimalista, sem roubar foco).
 - [ ] **M — hotkey + gamepad**.

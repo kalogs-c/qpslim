@@ -97,6 +97,13 @@ pub fn build(b: *std.Build) void {
     const exe = addCxxExecutable(b, target, optimize, "dx11-test", &exe_sources, &syslibs);
     exe.subsystem = .Windows;
 
+    // Game-like harness for injector + discovery validation. Never loads
+    // the DLL itself; shares syslibs with dx11-test.
+    const inject_sources = [_][]const u8{"graphics-api/dx11-inject/main.cpp"};
+    const inject_test =
+        addCxxExecutable(b, target, optimize, "inject-test", &inject_sources, &syslibs);
+    inject_test.subsystem = .Windows;
+
     // Test-harness tool, not injected code.
     const injector_sources = [_][]const u8{"injector/main.cpp"};
     const injector_syslibs = [_][]const u8{ "kernel32", "shell32" };
