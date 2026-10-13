@@ -3,6 +3,7 @@
 
 #include "hook.h"
 #include "discover.h"
+#include "pipe.h"
 
 #define LIMITER_VERSION 1
 
@@ -33,6 +34,14 @@ extern "C" __declspec(dllexport) BOOL Limiter_HookCreation() {
 
 extern "C" __declspec(dllexport) void Limiter_UnhookCreation() {
   UnhookSwapChainCreation();
+}
+
+extern "C" __declspec(dllexport) BOOL Limiter_StartControl() {
+  return Pipe_Start() ? TRUE : FALSE;
+}
+
+extern "C" __declspec(dllexport) void Limiter_StopControl() {
+  Pipe_Stop();
 }
 
 BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {

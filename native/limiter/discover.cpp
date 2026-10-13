@@ -1,8 +1,8 @@
-// Swapchain discovery. See discover.h.
 #include "discover.h"
 
 #include "hook.h"
 #include "mem.h"
+#include "pipe.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -159,7 +159,6 @@ void PatchModuleImports(BYTE* base, FARPROC real_create) {
   }
 }
 
-// Hidden window, just real enough for a throwaway swapchain.
 const wchar_t* kBootstrapClass = L"QpslimBootstrap";
 
 HWND CreateHiddenWindow(HINSTANCE inst) {
@@ -350,10 +349,12 @@ bool HookSwapChainCreation() {
     return false;
   }
   factory->Release();
+  Pipe_Start();
   return true;
 }
 
 void UnhookSwapChainCreation() {
+  Pipe_Stop();
   if (g_factory_vtable && g_original_create) {
     WriteProtected(&g_factory_vtable[FACTORY_CREATE_SWAP_CHAIN_INDEX],
                    reinterpret_cast<void*>(g_original_create));

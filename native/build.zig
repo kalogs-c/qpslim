@@ -118,8 +118,10 @@ pub fn build(b: *std.Build) void {
         "limiter/limiter.cpp",
         "limiter/hook.cpp",
         "limiter/discover.cpp",
+        "limiter/pipe.cpp",
         "common/stats.cpp",
         "common/pacer.cpp",
+        "common/pipemsg.cpp",
     };
     addCxxSources(b, dll.root_module, &dll_sources);
 
@@ -135,4 +137,5 @@ pub fn build(b: *std.Build) void {
     addHostTest(b, test_step, optimize, "stats-test", "common/stats_test.zig", "common/stats.cpp");
     addHostTest(b, test_step, optimize, "pacer-test", "common/pacer_test.zig", "common/pacer.cpp");
     addHostTest(b, test_step, optimize, "args-test", "common/args_test.zig", "common/args.cpp");
+    addHostTest(b, test_step, optimize, "pipemsg-test", "common/pipemsg_test.zig", "common/pipemsg.cpp");
 }

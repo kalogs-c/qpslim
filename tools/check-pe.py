@@ -22,6 +22,8 @@ EXPORTS = [
     b"Limiter_GetStats",
     b"Limiter_HookCreation",
     b"Limiter_UnhookCreation",
+    b"Limiter_StartControl",
+    b"Limiter_StopControl",
 ]
 
 

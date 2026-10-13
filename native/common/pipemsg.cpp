@@ -1,0 +1,115 @@
+#include "pipemsg.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "args.h"
+
+namespace {
+
+const char* ErrText(int err) {
+  switch (err) {
+    case PIPE_ERR_VERSION:
+      return "bad_version";
+    case PIPE_ERR_FPS:
+      return "bad_fps";
+    case PIPE_ERR_STATS:
+      return "no_stats";
+    default:
+      return "bad_op";
+  }
+}
+
+bool TakeVersion(const char* line, bool* ok) {
+  const char* at = strstr(line, "\"v\":");
+  if (!at) {
+    return false;
+  }
+  char* end = nullptr;
+  unsigned long v = strtoul(at + 4, &end, 10);
+  *ok = (end != at + 4 && v == 1);
+  return true;
+}
+
+bool TakeFps(const char* line, uint32_t* fps) {
+  const char* at = strstr(line, "\"fps\":");
+  if (!at) {
+    return false;
+  }
+  char* end = nullptr;
+  unsigned long v = strtoul(at + 6, &end, 10);
+  if (end == at + 6 || v > FPS_MAX) {
+    return false;
+  }
+  *fps = static_cast<uint32_t>(v);
+  return true;
+}
+
+}  // namespace
+
+void PipeParse(const char* line, PipeRequest* out) {
+  PipeRequest bad = {PIPE_OP_NONE, 0, PIPE_ERR_OP};
+  if (!line || !out) {
+    if (out) {
+      *out = bad;
+    }
+    return;
+  }
+  bool version_ok = false;
+  if (!TakeVersion(line, &version_ok)) {
+    bad.err = PIPE_ERR_VERSION;
+    *out = bad;
+    return;
+  }
+  if (!version_ok) {
+    bad.err = PIPE_ERR_VERSION;
+    *out = bad;
+    return;
+  }
+  if (strstr(line, "\"op\":\"set_fps\"")) {
+    uint32_t fps = 0;
+    if (!TakeFps(line, &fps)) {
+      bad.err = PIPE_ERR_FPS;
+      *out = bad;
+      return;
+    }
+    PipeRequest req = {PIPE_OP_SET_FPS, fps, PIPE_ERR_NONE};
+    *out = req;
+    return;
+  }
+  if (strstr(line, "\"op\":\"get_stats\"")) {
+    PipeRequest req = {PIPE_OP_GET_STATS, 0, PIPE_ERR_NONE};
+    *out = req;
+    return;
+  }
+  *out = bad;
+}
+
+int PipeFormatOk(char* buf, uint64_t size) {
+  if (!buf || size == 0) {
+    return -1;
+  }
+  return snprintf(buf, static_cast<size_t>(size), "{\"v\":1,\"ok\":true}");
+}
+
+int PipeFormatErr(char* buf, uint64_t size, int err) {
+  if (!buf || size == 0) {
+    return -1;
+  }
+  return snprintf(buf, static_cast<size_t>(size),
+                  "{\"v\":1,\"ok\":false,\"err\":\"%s\"}", ErrText(err));
+}
+
+int PipeFormatStats(char* buf, uint64_t size, const LimiterStats* stats) {
+  if (!buf || size == 0 || !stats) {
+    return -1;
+  }
+  return snprintf(buf, static_cast<size_t>(size),
+                  "{\"v\":1,\"ok\":true,\"present_count\":%llu,"
+                  "\"fps_avg\":%.3f,\"frametime_avg_ms\":%.3f,"
+                  "\"frametime_max_ms\":%.3f}",
+                  static_cast<unsigned long long>(stats->present_count),
+                  stats->fps_avg, stats->frametime_avg_ms,
+                  stats->frametime_max_ms);
+}
