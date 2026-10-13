@@ -121,6 +121,25 @@ Incompatibilidade conhecida: overlays de terceiros no mesmo slot (ex.: Steam
 overlay) travam o jogo — coabitação adiada para o pós-MVP; overlay OFF
 obrigatório nos runs de validação.
 
+## Controle via pipe (Etapa K)
+
+`pipe.h/.cpp`: thread dedicada (`BELOW_NORMAL`) servindo
+`\\.\pipe\qpslim-<pid>` — um cliente por vez, protocolo JSON-lines v1
+(ver `docs/CORE.md`): `set_fps` despacha para `SetTargetFps`,
+`get_stats` para `GetPresentStats`. Parser manual (`strstr` + `strtoul`,
+sem lib JSON na DLL); matemática de mensagem pura em
+`common/pipemsg.{h,cpp}` com testes em `common/pipemsg_test.zig`.
+Sobe junto com `HookSwapChainCreation` (best-effort) e desce em
+`UnhookSwapChainCreation`; exports extras `Limiter_StartControl` /
+`Limiter_StopControl`. Só a thread do pipe muta o alvo — a thread do
+`Present` nunca bloqueia em IPC.
+
+Limites: linhas de até 4 KB (acima disso, desconecta sem resposta);
+parada aguarda cliente ativo desconectar; ACL padrão (mesmo usuário).
+Validado no Windows via `inject-test` + `set_fps`: `stats` com
+`present_count` crescente, `60`/`120` seguidos pelo título, `off`
+free-run, `on` volta ao último alvo.
+
 ## Medição (Etapa D)
 
 Cada `Present` carimba `QueryPerformanceCounter`; deltas em ticks vão para um
@@ -134,9 +153,9 @@ Baseline sob cap 60 (run Windows): `avg≈16.65ms`, `max≈31.6ms` sistemático
 
 ## Testes
 
-`mise run test` (da raiz) roda `common/stats_test.zig` no host via
-`zig build test`: matemática pura de `common/stats.h` (`WindowBounds`,
-`StatsCompute`) — sem Windows, sem D3D. Hook, DLL e teardown continuam
+`mise run test` (da raiz) roda os testes host via `zig build test`:
+matemática pura de `common/` (`stats`, `pacer`, `args`, `pipemsg`) —
+sem Windows, sem D3D. Hook, DLL e teardown continuam
 manuais no Windows. Logs periódicos do teste saem a cada 2s para não
 inundar o DebugView.
 
@@ -150,8 +169,8 @@ carrega via `LoadLibrary("limiter.dll")` e entrega sua swapchain via
 * `DllMain` mínimo: só log + `DisableThreadLibraryCalls` (loader lock).
 * API exportada: `Limiter_HookSwapChain` / `Limiter_UnhookSwapChain` /
   `Limiter_SetTargetFps(n)` / `Limiter_GetStats` /
-  `Limiter_HookCreation` / `Limiter_UnhookCreation` (+ controle via pipe
-  na Etapa K) — a UI nunca fala com o backend diretamente
-  (ver `docs/CORE.md`).
+  `Limiter_HookCreation` / `Limiter_UnhookCreation` /
+  `Limiter_StartControl` / `Limiter_StopControl` — a UI nunca fala com o
+  backend diretamente (ver `docs/CORE.md`).
 * Sem dependência da Steam; alvo de teste exclusivo é o `dx11-test` até o
   pacing estar provado. Sem anti-cheat/DRM — ver `docs/PLAN.md` §9.

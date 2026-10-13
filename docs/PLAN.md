@@ -7,8 +7,8 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | J validada — próxima K (núcleo Rust) |
-| Última atualização | 2026-09-25 |
+| Etapa atual | K validada — próxima L (UI Tauri) |
+| Última atualização | 2026-10-13 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
 
@@ -17,7 +17,7 @@
 | Camada | Doc | Estado |
 |---|---|---|
 | `native/` — hook DLL, pacer, injector (C++) | `docs/NATIVE.md` | PoC em andamento (Etapas A–E feitas) |
-| `core/` — Limiter API, profiles, detecção (Rust) | `docs/CORE.md` | Planejado (Etapa K) |
+| `core/` — Limiter API, profiles, detecção (Rust) | `docs/CORE.md` | Núcleo com controle via pipe (Etapa K feita) |
 | `app/` — overlay/UI (Tauri) | `docs/TAURI.md` | Planejado (Etapa L) |
 
 ## 1. Objetivo
@@ -49,7 +49,9 @@ correta). Steam é fonte de detecção, nunca dependência do limiter.
       limpo, DLL inerte sem setter — esperado).
 - [x] **J — descoberta automática** (factory+IAT+bootstrap multi-vtable;
       validada via `inject-test`: engajamento, re-adoção, saída limpa).
-- [ ] **K — núcleo em Rust** (`core/`).
+- [x] **K — núcleo em Rust** (`core/`: protocolo JSON-lines v1 + cliente
+      com toggle; controle ao vivo validado no Windows via `inject-test`:
+      `stats`, `set_fps 60/120`, `off`/`on` com memória do último alvo).
 - [ ] **L — UI Tauri** (overlay minimalista, sem roubar foco).
 - [ ] **M — hotkey + gamepad**.
 - [ ] **N — detecção Steam/processos**.
