@@ -1,6 +1,7 @@
 min_version = "2026.4.0"
 
 [tools]
+rust = "1.94.0"
 zig = "0.16.0"
 
 [tasks.build]
@@ -17,6 +18,15 @@ run = "zig build -Doptimize=ReleaseFast"
 description = "Run host unit tests"
 dir = "native"
 run = "zig build test"
+
+[tasks.check]
+description = "Check PE artifacts (MZ, x86-64, subsystem, exports)"
+run = "python3 tools/check-pe.py"
+
+[tasks.core-test]
+description = "Run Rust core unit tests"
+run = "cargo test -p qpslim-core"
+dir = "core"
 
 [tasks.clean]
 description = "Remove build artifacts"
