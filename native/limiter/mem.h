@@ -1,5 +1,3 @@
-// Protected pointer write for vtable slots and IAT cells.
-// Single helper for hook.cpp and discover.cpp. Include after <windows.h>.
 #pragma once
 
 #include <windows.h>

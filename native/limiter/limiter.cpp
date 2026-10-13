@@ -1,7 +1,3 @@
-// limiter.dll — version + hook control + frame cap + creation discovery.
-// Hooks live in hook.cpp (Present) and discover.cpp (creation).
-// Win32 API only (no STL): keeps libc/libc++ out of the DLL.
-
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 

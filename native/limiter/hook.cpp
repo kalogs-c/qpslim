@@ -1,4 +1,3 @@
-// Present hook via vtable slot patch.
 #include "hook.h"
 
 #include "mem.h"
@@ -35,7 +34,6 @@ int g_class_count = 0;
 LONG64 g_rejected_count = 0;
 LONG64 g_present_count = 0;
 
-// Index of a hooked class, or -1. Single lookup for install and forward.
 int FindClassIndex(void** vtable) {
   for (int i = 0; i < g_class_count; i++) {
     if (g_classes[i].vtable == vtable) {
@@ -45,17 +43,12 @@ int FindClassIndex(void** vtable) {
   return -1;
 }
 
-// Ring buffer of QPC deltas (ticks, integer-only on the hot path).
-// g_present_count doubles as total and as ring index (count % N).
 uint64_t g_frametimes[STATS_WINDOW] = {};
 uint64_t g_prev_ticks = 0;
 uint64_t g_qpc_freq = 0;
-// Frame cap interval in ticks, 0 = unlimited.
 uint64_t g_interval_ticks = 0;
 uint64_t g_next_deadline = 0;
-// Configured target; applied whenever frequency is known.
 int g_target_fps = DEFAULT_TARGET_FPS;
-// Last stretch covered by QPC spin.
 uint64_t g_spin_margin_ticks = 0;
 bool g_timer_high_res = false;
 
@@ -176,8 +169,6 @@ void SetTargetFps(int fps) {
 
 bool HookSwapChain(IDXGISwapChain* swapchain) {
   // Install happens once at startup; concurrent installs are the caller's job.
-  // DXGI vtables are static per COM class: one patch covers every instance
-  // of that class, and each new class is adopted on sight (up to the table).
   if (!swapchain) {
     return false;
   }
@@ -185,8 +176,6 @@ bool HookSwapChain(IDXGISwapChain* swapchain) {
   int index = FindClassIndex(vtable);
   bool fresh = false;
   if (index >= 0) {
-    // Known class: re-patch only if the slot was restored (e.g. after
-    // unhook); otherwise already covered.
     if (vtable[PRESENT_VTABLE_INDEX] ==
         reinterpret_cast<void*>(&HookedPresent)) {
       return true;
@@ -228,8 +217,6 @@ void UnhookSwapChain() {
     WriteProtected(&g_classes[i].vtable[PRESENT_VTABLE_INDEX],
                    reinterpret_cast<void*>(g_classes[i].original));
   }
-  // Entries intentionally kept: in-flight HookedPresent calls still route
-  // through them, and DXGI code is always valid.
   ReleaseTimerRes();
   OutputDebugStringA("limiter: present unhooked, slot restored");
 }

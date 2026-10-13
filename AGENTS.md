@@ -14,8 +14,11 @@
 
 * **Chaves sempre** em `if`/`else`/`for`/`while`, mesmo com corpo de uma linha
   (inclusive guardas de retorno antecipado).
-* **Comentários mínimos**: só o que tem valor real ("porquê", nunca "o quê").
-  Sem comentário óbvio, sem código morto, sem variáveis não usadas.
+* **Comentários mínimos**: apagar tudo, manter só o difícil de ler —
+  matemática, traps low-level (índices de vtable, ABI), contratos de
+  concorrência/segurança (loader lock, publicação, single-writer) e o
+  "porquê" de decisões não óbvias. Sem restatar nome/assinatura, sem
+  placeholders auto-expiráveis, sem overview que duplica `docs/`.
 * Preferir retornos antecipados e helpers pequenos (`TryLoadLimiter`,
   `TryHookPresent`) a aninhamento profundo.
 * **Privado por padrão**: tudo dentro de `namespace {}`; só a API pública
@@ -36,7 +39,7 @@
 * Build do nativo: `mise run build` (da raiz). Nunca commitar sem rodar.
 * Testes host: `mise run test` (matemática pura em Zig; hook/DLL seguem
   manuais no Windows).
-* Após qualquer mudança no nativo: checar PE (`MZ`, x64, subsystem GUI,
+* Após qualquer mudança no nativo: `mise run check` (`MZ`, x64, subsystem GUI,
   exports) antes de pedir validação no Windows.
 * **Commits**: nunca commitar sem pedido explícito — o usuário valida os
   binários no Windows primeiro.
