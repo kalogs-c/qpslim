@@ -3,6 +3,7 @@ use std::fmt;
 
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const FPS_MAX: u32 = 1000;
+pub const DEFAULT_TARGET_FPS: u32 = 60;
 pub const MAX_LINE: usize = 4096;
 
 #[derive(Debug, PartialEq)]
