@@ -16,7 +16,7 @@
 #define LOG_EVERY_N_PRESENTS 300
 #define STATS_WINDOW 240
 #define SPIN_MARGIN_MS 2
-#define DEFAULT_TARGET_FPS 30 // Unmistakable drop on 60Hz+ displays.
+#define DEFAULT_TARGET_FPS 60
 
 namespace {
 
