@@ -21,25 +21,38 @@ const char* ErrText(int err) {
   }
 }
 
+const char* AfterKey(const char* line, const char* key) {
+  const char* at = strstr(line, key);
+  if (!at) {
+    return nullptr;
+  }
+  return at + strlen(key);
+}
+
+void Fail(PipeRequest* out, int err) {
+  PipeRequest req = {PIPE_OP_NONE, 0, err};
+  *out = req;
+}
+
 bool TakeVersion(const char* line, bool* ok) {
-  const char* at = strstr(line, "\"v\":");
+  const char* at = AfterKey(line, "\"v\":");
   if (!at) {
     return false;
   }
   char* end = nullptr;
-  unsigned long v = strtoul(at + 4, &end, 10);
-  *ok = (end != at + 4 && v == 1);
+  unsigned long v = strtoul(at, &end, 10);
+  *ok = (end != at && v == 1);
   return true;
 }
 
 bool TakeFps(const char* line, uint32_t* fps) {
-  const char* at = strstr(line, "\"fps\":");
+  const char* at = AfterKey(line, "\"fps\":");
   if (!at) {
     return false;
   }
   char* end = nullptr;
-  unsigned long v = strtoul(at + 6, &end, 10);
-  if (end == at + 6 || v > FPS_MAX) {
+  unsigned long v = strtoul(at, &end, 10);
+  if (end == at || v > FPS_MAX) {
     return false;
   }
   *fps = static_cast<uint32_t>(v);
@@ -57,21 +70,14 @@ void PipeParse(const char* line, PipeRequest* out) {
     return;
   }
   bool version_ok = false;
-  if (!TakeVersion(line, &version_ok)) {
-    bad.err = PIPE_ERR_VERSION;
-    *out = bad;
-    return;
-  }
-  if (!version_ok) {
-    bad.err = PIPE_ERR_VERSION;
-    *out = bad;
+  if (!TakeVersion(line, &version_ok) || !version_ok) {
+    Fail(out, PIPE_ERR_VERSION);
     return;
   }
   if (strstr(line, "\"op\":\"set_fps\"")) {
     uint32_t fps = 0;
     if (!TakeFps(line, &fps)) {
-      bad.err = PIPE_ERR_FPS;
-      *out = bad;
+      Fail(out, PIPE_ERR_FPS);
       return;
     }
     PipeRequest req = {PIPE_OP_SET_FPS, fps, PIPE_ERR_NONE};

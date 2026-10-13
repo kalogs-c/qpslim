@@ -80,6 +80,10 @@ void ServeClient(HANDLE pipe) {
   }
 }
 
+bool ShouldStop() {
+  return WaitForSingleObject(g_stop, 0) == WAIT_OBJECT_0;
+}
+
 DWORD WINAPI PipeThread(LPVOID) {
   char name[64];
   PipeName(name, sizeof(name));
@@ -94,7 +98,7 @@ DWORD WINAPI PipeThread(LPVOID) {
     BOOL connected = ConnectNamedPipe(pipe, nullptr);
     if (!connected && GetLastError() != ERROR_PIPE_CONNECTED) {
       CloseHandle(pipe);
-      if (WaitForSingleObject(g_stop, 0) == WAIT_OBJECT_0) {
+      if (ShouldStop()) {
         return 0;
       }
       continue;
@@ -102,7 +106,7 @@ DWORD WINAPI PipeThread(LPVOID) {
     ServeClient(pipe);
     DisconnectNamedPipe(pipe);
     CloseHandle(pipe);
-    if (WaitForSingleObject(g_stop, 0) == WAIT_OBJECT_0) {
+    if (ShouldStop()) {
       return 0;
     }
   }

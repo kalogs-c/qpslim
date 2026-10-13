@@ -29,12 +29,8 @@ impl Transport for PipeTransport {
         pipe.write_all(b"\n")?;
         let mut line = String::new();
         BufReader::new(pipe).read_line(&mut line)?;
-        if line.ends_with('\n') {
-            line.pop();
-        }
-        if line.ends_with('\r') {
-            line.pop();
-        }
+        line.pop_if(|c| c == '\n');
+        line.pop_if(|c| c == '\r');
         Ok(line)
     }
 }
@@ -101,25 +97,26 @@ impl<T: Transport> LimiterClient<T> {
     }
 
     pub fn enable(&mut self, on: bool) -> Result<(), ClientError> {
-        let fps = if on { self.target } else { 0 };
-        let request = Request::set_fps(fps)?;
-        self.send(&request.encode())
+        self.set_fps(if on { self.target } else { 0 })
     }
 
     pub fn stats(&self) -> Result<StatsReply, ClientError> {
-        let line = self.transport.roundtrip(&Request::GetStats.encode())?;
-        match decode_reply(&line)? {
+        match self.roundtrip_decode(&Request::GetStats.encode())? {
             Reply::Stats(s) => Ok(s),
             Reply::Ok => Err(ClientError::Proto(ProtoError::Malformed)),
         }
     }
 
     fn send(&self, body: &str) -> Result<(), ClientError> {
-        let line = self.transport.roundtrip(body)?;
-        match decode_reply(&line)? {
+        match self.roundtrip_decode(body)? {
             Reply::Ok => Ok(()),
             Reply::Stats(_) => Err(ClientError::Proto(ProtoError::Malformed)),
         }
+    }
+
+    fn roundtrip_decode(&self, body: &str) -> Result<Reply, ClientError> {
+        let line = self.transport.roundtrip(body)?;
+        Ok(decode_reply(&line)?)
     }
 }
 

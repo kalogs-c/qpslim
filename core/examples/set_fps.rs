@@ -12,15 +12,14 @@ fn run(pid: u32, op: &str) -> Result<(), String> {
     match op {
         "on" => client.enable(true).map_err(|e| e.to_string()),
         "off" => client.enable(false).map_err(|e| e.to_string()),
-        "stats" => client
-            .stats()
-            .map(|s| {
-                println!(
-                    "present_count={} fps_avg={:.2} avg_ms={:.3} max_ms={:.3}",
-                    s.present_count, s.fps_avg, s.frametime_avg_ms, s.frametime_max_ms
-                );
-            })
-            .map_err(|e| e.to_string()),
+        "stats" => {
+            let s = client.stats().map_err(|e| e.to_string())?;
+            println!(
+                "present_count={} fps_avg={:.2} avg_ms={:.3} max_ms={:.3}",
+                s.present_count, s.fps_avg, s.frametime_avg_ms, s.frametime_max_ms
+            );
+            Ok(())
+        }
         fps => {
             let target: u32 = fps.parse().map_err(|_| format!("bad fps '{fps}'"))?;
             client.set_fps(target).map_err(|e| e.to_string())?;
@@ -35,11 +34,10 @@ fn main() -> ExitCode {
     if args.len() != 3 {
         return usage();
     }
-    let pid: u32 = match args[1].parse() {
-        Ok(pid) => pid,
-        Err(_) => return usage(),
+    let Ok(pid) = args[1].parse() else {
+        return usage();
     };
-    match run(pid, &args[2]) {
+    match run(pid, args[2].as_str()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("Error: {e}");

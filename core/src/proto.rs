@@ -26,10 +26,7 @@ impl Request {
                 "{{\"v\":{},\"op\":\"set_fps\",\"fps\":{fps}}}",
                 PROTOCOL_VERSION
             ),
-            Request::GetStats => format!(
-                "{{\"v\":{},\"op\":\"get_stats\"}}",
-                PROTOCOL_VERSION
-            ),
+            Request::GetStats => format!("{{\"v\":{},\"op\":\"get_stats\"}}", PROTOCOL_VERSION),
         }
     }
 }
@@ -86,6 +83,7 @@ pub fn decode_reply(line: &str) -> Result<Reply, ProtoError> {
     if line.len() > MAX_LINE {
         return Err(ProtoError::TooLong);
     }
+
     let raw: RawReply = serde_json::from_str(line).map_err(|_| ProtoError::Malformed)?;
     if raw.v != PROTOCOL_VERSION {
         return Err(ProtoError::BadVersion);
@@ -95,19 +93,24 @@ pub fn decode_reply(line: &str) -> Result<Reply, ProtoError> {
             raw.err.unwrap_or_else(|| "unknown".to_string()),
         ));
     }
-    match (
+
+    let fields = (
         raw.present_count,
         raw.fps_avg,
         raw.frametime_avg_ms,
         raw.frametime_max_ms,
-    ) {
+    );
+
+    match fields {
         (Some(present_count), Some(fps_avg), Some(frametime_avg_ms), Some(frametime_max_ms)) => {
-            Ok(Reply::Stats(StatsReply {
+            let status_reply = StatsReply {
                 present_count,
                 fps_avg,
                 frametime_avg_ms,
                 frametime_max_ms,
-            }))
+            };
+
+            Ok(Reply::Stats(status_reply))
         }
         (None, None, None, None) => Ok(Reply::Ok),
         _ => Err(ProtoError::Malformed),

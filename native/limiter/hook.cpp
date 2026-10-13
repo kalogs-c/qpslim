@@ -149,6 +149,27 @@ HRESULT STDMETHODCALLTYPE HookedPresent(IDXGISwapChain* self, UINT sync,
   return original(self, sync, flags);
 }
 
+bool ReserveClassSlot(void** vtable, int* index, bool* fresh) {
+  *fresh = false;
+  int found = FindClassIndex(vtable);
+  if (found >= 0) {
+    *index = found;
+    return true;
+  }
+  if (g_class_count >= MAX_HOOKED_CLASSES) {
+    OutputDebugStringA("limiter: class table full, swapchain not hooked");
+    return false;
+  }
+  // Store before patching: any thread reaching HookedPresent from here on
+  // must see a valid original.
+  *index = g_class_count++;
+  g_classes[*index].vtable = vtable;
+  g_classes[*index].original =
+      reinterpret_cast<PresentFn>(vtable[PRESENT_VTABLE_INDEX]);
+  *fresh = true;
+  return true;
+}
+
 } // namespace
 
 void ApplyTarget() {
@@ -173,25 +194,16 @@ bool HookSwapChain(IDXGISwapChain* swapchain) {
     return false;
   }
   void** vtable = *reinterpret_cast<void***>(swapchain);
-  int index = FindClassIndex(vtable);
+  int index = -1;
   bool fresh = false;
-  if (index >= 0) {
+  if (!ReserveClassSlot(vtable, &index, &fresh)) {
+    return false;
+  }
+  if (!fresh) {
     if (vtable[PRESENT_VTABLE_INDEX] ==
         reinterpret_cast<void*>(&HookedPresent)) {
       return true;
     }
-  } else {
-    if (g_class_count >= MAX_HOOKED_CLASSES) {
-      OutputDebugStringA("limiter: class table full, swapchain not hooked");
-      return false;
-    }
-    // Store before patching: any thread reaching HookedPresent from here on
-    // must see a valid original.
-    index = g_class_count++;
-    g_classes[index].vtable = vtable;
-    g_classes[index].original =
-        reinterpret_cast<PresentFn>(vtable[PRESENT_VTABLE_INDEX]);
-    fresh = true;
   }
   LARGE_INTEGER freq = {};
   if (QueryPerformanceFrequency(&freq)) {
