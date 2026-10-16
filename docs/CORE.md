@@ -20,9 +20,10 @@ diretamente — fala com a `limiter.dll` injetada pelo pipe
 → erro                               → {"v":1,"ok":false,"err":"bad_fps|bad_op|bad_version|no_stats"}
 ```
 
-`fps: 0` = livre; `1..=1000`. Bytes exatos travados por testes dos dois
-lados (`core/tests/proto_roundtrip.rs` + `common/pipemsg_test.zig`) —
-o parser C não tem lib JSON e depende do formato.
+`fps: 0` = livre; `1..=1000`. Bytes exatos travados pela fonte única
+`native/common/testdata/pipe_vectors.txt`, consumida dos dois lados
+(`core/tests/interop.rs` + `common/pipemsg_test.zig`; goldens locais em
+`proto_roundtrip.rs`) — o parser C não tem lib JSON e depende do formato.
 
 ## API Rust (`core/src/`)
 

@@ -155,9 +155,13 @@ Baseline sob cap 60 (run Windows): `avg≈16.65ms`, `max≈31.6ms` sistemático
 
 `mise run test` (da raiz) roda os testes host via `zig build test`:
 matemática pura de `common/` (`stats`, `pacer`, `args`, `pipemsg`) —
-sem Windows, sem D3D. Hook, DLL e teardown continuam
-manuais no Windows. Logs periódicos do teste saem a cada 2s para não
-inundar o DebugView.
+sem Windows, sem D3D. `mise run core-test` roda o `core/` Rust, incluindo
+o interop contra `common/testdata/pipe_vectors.txt` (fonte única dos bytes
+do protocolo v1, consumida dos dois lados). Seguem manuais no Windows,
+sem cobertura automatizada: `limiter/pipe.cpp` (limite 4 KB, 1 cliente,
+start/stop), `hook.cpp`, `discover.cpp`, `limiter.cpp`, `injector/` e
+`graphics-api/` (validação via `dx11-test`/`inject-test` + DebugView).
+Logs periódicos do teste saem a cada 2s para não inundar o DebugView.
 
 Detalhe de build: a DLL linka `kernel32` + libc mingw (headers + startup),
 **sem** `libc++` — usa só Win32 API + `<stdio.h>`, de propósito. O `dx11-test`
