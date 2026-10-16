@@ -8,7 +8,7 @@ bool WindowBounds(uint64_t count, uint64_t window_size, uint64_t* first,
     return false;
   }
   // count-1 deltas stored (the first Present only arms the clock).
-  if (count < 2) {
+  if (count < 2 || window_size == 0) {
     return false;
   }
   uint64_t stored = count - 1;
@@ -29,6 +29,9 @@ bool StatsCompute(const uint64_t* deltas, uint64_t n, uint64_t freq,
     if (deltas[i] > max) {
       max = deltas[i];
     }
+  }
+  if (sum == 0) {
+    return false;
   }
   double avg_ticks = static_cast<double>(sum) / static_cast<double>(n);
   double f = static_cast<double>(freq);

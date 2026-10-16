@@ -4,10 +4,14 @@
 
 uint64_t SleepMsFor(uint64_t now, uint64_t deadline, uint64_t freq,
                     uint64_t spin_margin_ticks) {
-  if (freq == 0 || now + spin_margin_ticks >= deadline) {
+  if (freq == 0 || now >= deadline) {
     return 0;
   }
-  return (deadline - spin_margin_ticks - now) * 1000 / freq;
+  uint64_t remaining = deadline - now;
+  if (remaining <= spin_margin_ticks) {
+    return 0;
+  }
+  return (remaining - spin_margin_ticks) * 1000 / freq;
 }
 
 uint64_t AdvanceDeadline(uint64_t deadline, uint64_t interval, uint64_t now) {

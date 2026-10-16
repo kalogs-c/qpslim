@@ -34,6 +34,11 @@ void Fail(PipeRequest* out, int err) {
   *out = req;
 }
 
+bool IsNumEnd(char c) {
+  return c == '\0' || c == ',' || c == '}' || c == ' ' || c == '\t' ||
+         c == '\r' || c == '\n';
+}
+
 bool TakeVersion(const char* line, bool* ok) {
   const char* at = AfterKey(line, "\"v\":");
   if (!at) {
@@ -41,7 +46,7 @@ bool TakeVersion(const char* line, bool* ok) {
   }
   char* end = nullptr;
   unsigned long v = strtoul(at, &end, 10);
-  *ok = (end != at && v == 1);
+  *ok = (end != at && v == 1 && IsNumEnd(*end));
   return true;
 }
 
@@ -52,7 +57,7 @@ bool TakeFps(const char* line, uint32_t* fps) {
   }
   char* end = nullptr;
   unsigned long v = strtoul(at, &end, 10);
-  if (end == at || v > FPS_MAX) {
+  if (end == at || !IsNumEnd(*end) || v > FPS_MAX) {
     return false;
   }
   *fps = static_cast<uint32_t>(v);
