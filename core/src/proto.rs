@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub const PROTOCOL_VERSION: u32 = 1;
@@ -31,7 +31,7 @@ impl Request {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct StatsReply {
     pub present_count: u64,
     pub fps_avg: f64,

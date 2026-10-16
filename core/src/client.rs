@@ -28,9 +28,9 @@ impl Transport for PipeTransport {
         pipe.write_all(b"\n")?;
         let mut line = String::new();
         BufReader::new(pipe).read_line(&mut line)?;
-        line.pop_if(|c| c == '\n');
-        line.pop_if(|c| c == '\r');
-        Ok(line)
+        let line = line.strip_suffix('\n').unwrap_or(&line);
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        Ok(line.to_string())
     }
 }
 

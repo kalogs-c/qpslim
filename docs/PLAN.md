@@ -7,8 +7,8 @@
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | K validada — próxima L (UI Tauri) |
-| Última atualização | 2026-10-13 |
+| Etapa atual | L em andamento (UI Tauri: Svelte+TS, npm; layout 3 elementos travado) |
+| Última atualização | 2026-10-16 |
 | Build do nativo | `zig build` via `mise` (só `zig 0.16.0`) |
 | Alvo | `x86_64-windows-gnu`, saída em `native/zig-out/bin/` |
 
@@ -52,14 +52,19 @@ correta). Steam é fonte de detecção, nunca dependência do limiter.
 - [x] **K — núcleo em Rust** (`core/`: protocolo JSON-lines v1 + cliente
       com toggle; controle ao vivo validado no Windows via `inject-test`:
       `stats`, `set_fps 60/120`, `off`/`on` com memória do último alvo).
-- [ ] **L — UI Tauri** (overlay minimalista, sem roubar foco).
-- [ ] **M — hotkey + gamepad**.
-- [ ] **N — detecção Steam/processos**.
+- [ ] **L — UI Tauri** (Svelte+TS+Vite+Tauri v2, npm; overlay de 3 elementos:
+  PID editável no topo, seletor de presets no meio com verde ON/OFF, fps atual
+  discreto na base; teclado em L espelha o gamepad de M; fatias L0 scaffold →
+  L1 painel → L2 overlay).
+- [ ] **M — hotkey + gamepad** (cima/baixo presets, A ON/OFF, B esconder,
+  Start+Select + F11 mostrar/esconder).
+- [ ] **N — detecção Steam/processos** (PID manual em L vira detecção automática).
 - [ ] **O — profiles** (memorizar último limite por jogo).
 - [ ] **P — sugestões inteligentes** (pós-MVP).
 
-MVP 1.0: toggle, slider, presets, hotkey, gamepad, detecção do processo,
-iniciar com o Windows.
+MVP 1.0: toggle, seletor de presets, PID manual, show/hide (F11), gamepad,
+detecção do processo, iniciar com o Windows. Aviso anti-cheat vive na página
+de download do GitHub, não na UI.
 
 ## 3. Decisões técnicas registradas
 

@@ -1,6 +1,7 @@
 min_version = "2026.4.0"
 
 [tools]
+node = "lts"
 python = "3.14.7"
 rust = "1.94.0"
 zig = "0.16.0"
@@ -28,6 +29,11 @@ run = "python3 tools/check-pe.py"
 description = "Run Rust core unit tests"
 run = "cargo test -p qpslim-core"
 dir = "core"
+
+[tasks.app-test]
+description = "Run Tauri frontend unit tests (vitest)"
+run = "npm run test"
+dir = "app"
 
 [tasks.clean]
 description = "Remove build artifacts"
