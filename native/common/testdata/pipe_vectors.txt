@@ -1,0 +1,16 @@
+# Shared pipe protocol vectors (single source of truth).
+# Format: name=json (one per line, no wrapping).
+# Requests: Rust Request::encode must match byte-exact;
+# C PipeParse must accept with the same op/fps.
+# Replies: C PipeFormat* must match byte-exact;
+# Rust decode_reply must accept.
+set_fps_0={"v":1,"op":"set_fps","fps":0}
+set_fps_60={"v":1,"op":"set_fps","fps":60}
+set_fps_1000={"v":1,"op":"set_fps","fps":1000}
+get_stats={"v":1,"op":"get_stats"}
+ok={"v":1,"ok":true}
+err_fps={"v":1,"ok":false,"err":"bad_fps"}
+err_op={"v":1,"ok":false,"err":"bad_op"}
+err_version={"v":1,"ok":false,"err":"bad_version"}
+err_stats={"v":1,"ok":false,"err":"no_stats"}
+stats={"v":1,"ok":true,"present_count":1234,"fps_avg":59.940,"frametime_avg_ms":16.685,"frametime_max_ms":17.031}

@@ -25,6 +25,38 @@ test "empty or invalid input returns false" {
     try std.testing.expect(!StatsCompute(&.{tick_60}, 1, 0, 10, &out));
 }
 
+test "WindowBounds rejects empty window" {
+    var first: u64 = 0;
+    var n: u64 = 0;
+    try std.testing.expect(!WindowBounds(5, 0, &first, &n));
+}
+
+test "WindowBounds handles minimal and exact windows" {
+    var first: u64 = 0;
+    var n: u64 = 0;
+    try std.testing.expect(WindowBounds(2, window, &first, &n));
+    try std.testing.expectEqual(@as(u64, 2), first);
+    try std.testing.expectEqual(@as(u64, 1), n);
+    try std.testing.expect(WindowBounds(241, window, &first, &n));
+    try std.testing.expectEqual(@as(u64, 2), first);
+    try std.testing.expectEqual(@as(u64, 240), n);
+    try std.testing.expect(WindowBounds(10, 1, &first, &n));
+    try std.testing.expectEqual(@as(u64, 10), first);
+    try std.testing.expectEqual(@as(u64, 1), n);
+}
+
+test "StatsCompute rejects zero deltas" {
+    var zeros: [8]u64 = .{0} ** 8;
+    var out: LimiterStats = undefined;
+    try std.testing.expect(!StatsCompute(&zeros, zeros.len, freq, 9, &out));
+}
+
+test "StatsCompute handles a single delta" {
+    var out: LimiterStats = undefined;
+    try std.testing.expect(StatsCompute(&.{tick_60}, 1, freq, 2, &out));
+    try std.testing.expectApproxEqAbs(@as(f64, 60.0), out.fps_avg, 0.01);
+}
+
 test "WindowBounds slices the recent window" {
     var first: u64 = 0;
     var n: u64 = 0;

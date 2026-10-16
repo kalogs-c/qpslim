@@ -19,6 +19,15 @@ test "SleepMsFor returns zero when late or inside spin zone" {
     try std.testing.expectEqual(@as(u64, 0), SleepMsFor(200000, 166667, freq, margin));
     try std.testing.expectEqual(@as(u64, 0), SleepMsFor(150000, 166667, freq, margin));
     try std.testing.expectEqual(@as(u64, 0), SleepMsFor(0, 166667, 0, margin));
+    try std.testing.expectEqual(@as(u64, 0), SleepMsFor(166667, 166667, freq, margin));
+    try std.testing.expectEqual(@as(u64, 0), SleepMsFor(146667, 166667, freq, margin));
+}
+
+test "SleepMsFor handles margin edge and truncation" {
+    try std.testing.expectEqual(@as(u64, 1), SleepMsFor(0, 30000, freq, margin));
+    try std.testing.expectEqual(@as(u64, 0), SleepMsFor(146666, 166667, freq, margin));
+    try std.testing.expectEqual(@as(u64, 16), SleepMsFor(0, 166667, freq, 0));
+    try std.testing.expectEqual(@as(u64, 0), SleepMsFor(0xFFFFFFFFFFFFFF00, 1000, freq, margin));
 }
 
 test "AdvanceDeadline steps one interval normally" {
@@ -33,4 +42,10 @@ test "AdvanceDeadline skips missed beats without bursting" {
 
 test "AdvanceDeadline with zero interval is a no-op" {
     try std.testing.expectEqual(@as(u64, 100000), AdvanceDeadline(100000, 0, 50000));
+}
+
+test "AdvanceDeadline lands strictly past now" {
+    try std.testing.expectEqual(@as(u64, 300000), AdvanceDeadline(100000, 100000, 200000));
+    const next = AdvanceDeadline(100000, 100000, 550000);
+    try std.testing.expect(next > 550000);
 }
