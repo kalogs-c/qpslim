@@ -18,7 +18,7 @@ run = "zig build -Doptimize=ReleaseFast"
 [tasks.test]
 description = "Run host unit tests"
 dir = "native"
-run = "zig build test"
+run = "zig build test --summary all"
 
 [tasks.check]
 description = "Check PE artifacts (MZ, x86-64, subsystem, exports)"
