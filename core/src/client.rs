@@ -1,8 +1,7 @@
 use std::fmt;
 
 use crate::proto::{
-    DEFAULT_TARGET_FPS, ProtoError, Reply, Request, StatsReply, decode_reply,
-    pipe_name,
+    decode_reply, pipe_name, ProtoError, Reply, Request, StatsReply, DEFAULT_TARGET_FPS,
 };
 
 pub trait Transport {
