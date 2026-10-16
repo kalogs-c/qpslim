@@ -21,6 +21,7 @@
 
   function fail(message: unknown) {
     notice = message instanceof Error ? message.message : String(message);
+    console.error("[qpslim]", notice);
   }
 
   async function pushTarget() {
@@ -265,8 +266,8 @@
     font-size: 11px;
     opacity: 0.6;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: break-word;
   }
 </style>
